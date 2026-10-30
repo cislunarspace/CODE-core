@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
@@ -12,10 +14,12 @@ from e2m2e.algorithm.family.resonant_branch import (
     TRIVIAL_PROJECTION_TOLERANCE,
     MultiplierMerge,
     _is_startable,
+    _prepare_halo_seed,
+    _resonance_from_merge,
     classify_multiplier_pairs,
     locate_halo_multiplier_merges,
 )
-from e2m2e.data.types.orbit import OrbitFamily
+from e2m2e.data.types.orbit import Orbit, OrbitFamily
 from e2m2e.status import ConvergenceState, FailureCause
 
 
@@ -68,6 +72,34 @@ def test_startable_requires_refined_gap_and_projection() -> None:
     assert not _is_startable(
         _synthetic_merge(refined=True, projection=TRIVIAL_PROJECTION_TOLERANCE)
     )
+
+
+@pytest.mark.theory
+def test_resonance_from_merge_maps_starting_point() -> None:
+    """起链事件转共振点：单圈、零相位，状态与周期原样带入，复向量取实部。"""
+    event = _synthetic_merge(refined=True)
+    resonance = _resonance_from_merge(event)
+
+    assert resonance.revolutions == 1
+    assert resonance.phase_deg == pytest.approx(0.0)
+    assert resonance.x0 == pytest.approx(event.parameter)
+    assert resonance.period == pytest.approx(event.period)
+    assert resonance.multiplier_gap == pytest.approx(event.multiplier_gap)
+    np.testing.assert_allclose(resonance.state, event.state)
+
+    complex_event = replace(event, eigenvector=np.array([1.0, 1.0j, 0.0, 0.0, 0.0, 0.0]))
+    assert np.isrealobj(_resonance_from_merge(complex_event).eigenvector)
+
+
+@pytest.mark.theory
+def test_seed_with_non_l2_libration_point_is_rejected(dynamics: CR3BP_Dynamics) -> None:
+    """调用方给 L1 族成员时显式拒绝，不静默按 L2 南族标注。"""
+    seed = Orbit(states=np.zeros((1, 6)), times=np.zeros(1), system=dynamics.system)
+    seed.period = 2.4
+    seed.parameters = {"libration_point": 1}
+
+    with pytest.raises(ValueError, match="平动点必须为 L2"):
+        _prepare_halo_seed(dynamics, seed)
 
 
 @pytest.mark.theory

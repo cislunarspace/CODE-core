@@ -709,18 +709,18 @@ def _pair_spectrum(
     return classify_multiplier_pairs(matrix, flow, tangent)
 
 
-def _tight_halo(dynamics: CR3BP_Dynamics, orbit: Orbit, guess: Orbit | None) -> Orbit:
+def _tight_halo(dynamics: CR3BP_Dynamics, orbit: Orbit, guess: Orbit | None) -> tuple[Orbit, bool]:
     """用固定 x0 微分修正在同一 x0 处把成员收紧到闭合 1e-13 量级。
 
     原始 PAL 成员的闭合只到 1e-7 量级，平凡对的数值分裂可达 1e-3，
     与真实临界乘子同量级。精化成员必须先收紧，ν 才有意义。修正失败
-    时退回原成员，由调用方按 ``refined`` 如实报告。
+    时退回原成员并返回 ``False``，调用方据此把该端点记为未达精化容差。
     """
     x0 = float(orbit.states[0, 0])
     try:
-        return _correct_halo_x0(dynamics, x0, 2, guess if guess is not None else orbit)
+        return _correct_halo_x0(dynamics, x0, 2, guess if guess is not None else orbit), True
     except Cr3bpOrbitError:
-        return orbit
+        return orbit, False
 
 
 def _transverse_direction(matrix: np.ndarray, flow: np.ndarray) -> np.ndarray | None:
@@ -828,8 +828,8 @@ def _refine_merge(
     high_index: int,
 ) -> MultiplierMerge:
     """在 x0 区间内二分精化一次合并事件。"""
-    low_orbit = _tight_halo(dynamics, low_orbit, None)
-    high_orbit = _tight_halo(dynamics, high_orbit, low_orbit)
+    low_orbit, low_tightened = _tight_halo(dynamics, low_orbit, None)
+    high_orbit, high_tightened = _tight_halo(dynamics, high_orbit, low_orbit)
     low_x0 = float(low_orbit.states[0, 0])
     high_x0 = float(high_orbit.states[0, 0])
     low_pair = _merge_pair(_pair_spectrum(dynamics, low_orbit, tangent), kind)
@@ -837,9 +837,9 @@ def _refine_merge(
     low_indicator = _merge_indicator(low_pair, kind)
     high_indicator = _merge_indicator(high_pair, kind)
     guess = low_orbit
-    best = (abs(low_indicator), low_orbit, low_pair)
+    best = (abs(low_indicator), low_orbit, low_pair, low_tightened)
     if abs(high_indicator) < best[0]:
-        best = (abs(high_indicator), high_orbit, high_pair)
+        best = (abs(high_indicator), high_orbit, high_pair, high_tightened)
     bracket = (min(low_x0, high_x0), max(low_x0, high_x0))
     if low_x0 > high_x0:
         low_x0, high_x0 = high_x0, low_x0
@@ -865,12 +865,12 @@ def _refine_merge(
         pair = _merge_pair(_pair_spectrum(dynamics, candidate, tangent), kind)
         indicator = _merge_indicator(pair, kind)
         if abs(indicator) < best[0]:
-            best = (abs(indicator), candidate, pair)
+            best = (abs(indicator), candidate, pair, True)
         if _sign_changed(low_indicator, indicator):
             high_x0, high_indicator = candidate_x0, indicator
         else:
             low_x0, low_indicator = candidate_x0, indicator
-    refined = best[0] <= _MERGER_INDICATOR_TOL
+    refined = best[0] <= _MERGER_INDICATOR_TOL and best[3]
     return _build_merge(
         dynamics,
         best[1],
@@ -1119,6 +1119,11 @@ def _prepare_halo_seed(dynamics: CR3BP_Dynamics, seed_orbit: Orbit | None) -> Or
     if seed_orbit is None:
         orbit = _correct_halo(dynamics, -_HALO_SEED_Z0, 2, None)
     else:
+        supplied = seed_orbit.parameters.get("libration_point")
+        if supplied is not None and float(supplied) != 2.0:
+            raise ValueError(
+                f"种子族的平动点必须为 L2，当前为 {supplied}，本次定位沿 L2 南 Halo 族行走"
+            )
         orbit = Orbit(
             states=np.asarray(seed_orbit.states, dtype=float).copy(),
             times=np.asarray(seed_orbit.times, dtype=float).copy(),
