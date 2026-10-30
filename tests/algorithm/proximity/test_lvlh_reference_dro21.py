@@ -2,9 +2,9 @@
 
 角动量符号事实用周期内 25 点采样固定。记 h1 为质心会合角动量
 (r × v_syn)_z，h2 为月心会合角动量 ((r − r_moon) × v_syn)_z，h3 为
-月心惯性角动量 ((r − r_moon) × (v_syn + ω × r))_z。同一 2:1 DRO 上
-h1 在 t/T 约 0.21 与 0.79 过零，h2 全程为负，h3 在 t/T 约 0.28 与
-0.72 过零。
+月心惯性角动量 ((r − r_moon) × (v_syn + ω × (r − r_moon)))_z，速度取
+相对月球的惯性值。同一 2:1 DRO 上 h1 在 t/T 约 0.21 与 0.79 过零，
+h2 与 h3 全程为负。
 
 论文对照：杨驰航等，航空学报 2023 年 44 卷 5 期 326563 的式(12) 与
 式(13)。e3(0) = (0, 0.5554, 0, 0.8316, 0, 0) 由论文的随动导数速度
@@ -33,11 +33,11 @@ def _angular_momenta_z(states: np.ndarray, mu: float) -> tuple[np.ndarray, np.nd
     """返回质心会合、月心会合与月心惯性角动量的 z 分量。"""
     r = states[:, :3]
     v = states[:, 3:]
-    r_moon = np.array([1.0 - mu, 0.0, 0.0])
+    r_rel = r - np.array([1.0 - mu, 0.0, 0.0])
     omega = np.array([0.0, 0.0, 1.0])
     h1 = np.cross(r, v)[:, 2]
-    h2 = np.cross(r - r_moon, v)[:, 2]
-    h3 = np.cross(r - r_moon, v + np.cross(omega, r))[:, 2]
+    h2 = np.cross(r_rel, v)[:, 2]
+    h3 = np.cross(r_rel, v + np.cross(omega, r_rel))[:, 2]
     return h1, h2, h3
 
 
@@ -45,7 +45,7 @@ class TestAngularMomentumSigns:
     """2:1 DRO 周期内 25 点采样的角动量符号。"""
 
     def test_sign_pattern(self, dro21):
-        """月心会合角动量恒负，双质心与惯性口径各变号两次。"""
+        """月心会合与月心惯性角动量恒负，双质心会合角动量变号两次。"""
         orbit, dynamics = dro21
         period = float(orbit.period)
         times = np.linspace(0.0, period, _SAMPLES)
@@ -53,6 +53,7 @@ class TestAngularMomentumSigns:
         h1, h2, h3 = _angular_momenta_z(np.asarray(traj["states"], dtype=float), dynamics.system.mu)
 
         assert np.all(h2 < 0.0)
+        assert np.all(h3 < 0.0)
 
         def change_indices(values: np.ndarray) -> list[int]:
             return [
@@ -62,12 +63,9 @@ class TestAngularMomentumSigns:
             ]
 
         h1_changes = change_indices(h1)
-        h3_changes = change_indices(h3)
         assert len(h1_changes) == 2
-        assert len(h3_changes) == 2
         # 25 点等分一个周期，索引 i 对应 t/T = i/24。
         assert h1_changes == [6, 19]
-        assert h3_changes == [7, 18]
 
 
 class TestPaperTangent:
