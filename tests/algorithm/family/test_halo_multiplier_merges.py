@@ -6,12 +6,14 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics
+from e2m2e.algorithm.family import resonant_branch
 from e2m2e.algorithm.family.orbits.walk import earth_moon_system
 from e2m2e.algorithm.family.resonant_branch import (
     TRIVIAL_PROJECTION_TOLERANCE,
     classify_multiplier_pairs,
     locate_halo_multiplier_merges,
 )
+from e2m2e.data.types.orbit import OrbitFamily
 from e2m2e.status import ConvergenceState, FailureCause
 
 
@@ -99,3 +101,23 @@ def test_scan_without_crossing_reports_interval_and_gap(dynamics: CR3BP_Dynamics
     assert scan.members_scanned >= 2
     assert "x0 区间" in scan.message
     assert "最小偏差" in scan.message
+
+
+@pytest.mark.orchestration
+def test_scan_reports_walk_without_pairs(
+    monkeypatch: pytest.MonkeyPatch, dynamics: CR3BP_Dynamics
+) -> None:
+    """PAL 只返回种子成员时如实报告行走中断，不因零族切向抛异常。"""
+
+    def seed_only(continuation, seed_orbit, **kwargs):
+        return OrbitFamily([seed_orbit])
+
+    monkeypatch.setattr(resonant_branch, "halo_pseudo_arclength_continuation", seed_only)
+    scan = resonant_branch.locate_halo_multiplier_merges(dynamics, max_members=2)
+    assert scan.status is ConvergenceState.INFEASIBLE
+    assert scan.cause is FailureCause.NO_INTERSECTION
+    assert scan.events == ()
+    assert scan.resonance is None
+    assert scan.members_scanned == 1
+    assert scan.trace == ()
+    assert "提前中断" in scan.message

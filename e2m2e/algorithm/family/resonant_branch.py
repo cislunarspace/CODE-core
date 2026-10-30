@@ -935,6 +935,25 @@ def locate_halo_multiplier_merges(
         verbose=False,
     )
     members = list(family.orbits)[:max_members]
+    if len(members) < 2:
+        seed_state = np.asarray(members[0].states[0], dtype=float)
+        seed_period = float(members[0].period)
+        message = (
+            f"沿 L2 南 Halo 族行走在 {len(members)} 条成员后提前中断（请求 {max_members} 条），"
+            f"不足以计算相邻成员间的乘子轨迹；种子 x0={seed_state[0]:.6f}，"
+            f"T={seed_period:.6f} TU"
+        )
+        return HaloMergeScan(
+            status=ConvergenceState.INFEASIBLE,
+            cause=FailureCause.NO_INTERSECTION,
+            message=message,
+            events=(),
+            resonance=None,
+            members_scanned=len(members),
+            parameter_interval=(float(seed_state[0]), float(seed_state[0])),
+            period_interval=(seed_period, seed_period),
+            trace=(),
+        )
 
     states = [np.asarray(member.states[0], dtype=float) for member in members]
     tangents: list[np.ndarray] = []
