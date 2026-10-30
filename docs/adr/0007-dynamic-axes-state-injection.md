@@ -1,6 +1,6 @@
 # ADR 0007: Dynamic-axes state injection scheme
 
-**Status**: Adopted (decision 6 revised by ADR 0062)
+**Status**: Adopted (decisions 5 and 6 revised by ADR 0062)
 **Date**: 2026-06-15
 **Related Issue**: Slice 12 (dynamic axes and VNB/LVLH maneuver support)
 
@@ -107,6 +107,12 @@ untouched.
    against `LVLHAxes`. LVLH conventions vary in literature (some take z as
    `-r`, Earth-pointing); e2m2e adopts this entry — the RSW convention:
    radially outward, in-track, orbit-normal.
+
+   Revision (2026-10-30, ADR 0062): the radial and normal definitions above
+   are generalized to a reference body. With `LVLHAxes(reference=SECONDARY)`
+   the radial is `(r - r_body) / |r - r_body|` and the normal is along
+   `(r - r_body) × v`. The default BARYCENTER reference keeps the definitions
+   above unchanged.
 
 6. **`ObjectReferencedAxes` deferred.** `ObjectReferencedAxes` (relative axes
    centered on a celestial body, e.g. Moon-centered VNB) requires body state

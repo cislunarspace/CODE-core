@@ -185,6 +185,16 @@ class TestLVLH:
         rho_syn_back = rd.from_lvlh(rho_lvlh, rho_dot_lvlh, t)
         np.testing.assert_allclose(rho_syn, rho_syn_back, rtol=1e-10, atol=1e-15)
 
+    def test_non_barycenter_reference_requires_mu(self, circular_orbit):
+        """星历目标没有 system.mu 时，非双质心参考体报 ValueError。"""
+        orbit, _ = circular_orbit
+        target = TargetOrbit(orbit)
+        rd = RelativeDynamics(target, _EphemerisLikeDynamics())
+
+        rho_syn = np.array([1e-4, 2e-4, 1e-5, 1e-5, -1e-5, 0.0])
+        with pytest.raises(ValueError, match="mu"):
+            rd.to_lvlh(rho_syn, 1.5, reference=LVLHReference.SECONDARY)
+
 
 class TestPhasing:
     """调相设计。"""

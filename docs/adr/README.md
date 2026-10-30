@@ -29,7 +29,7 @@
 | 0004 | ForceModel config-driven | Adopted |
 | 0005 | TwoLevelMultipleShooting as an independent algorithm | Adopted (revoked 2026-08-13: implementation deleted, see revision at end) |
 | 0006 | Unified ephemeris-correction seam with registry dispatch | Adopted (revoked 2026-08-13: implementation deleted, see revision at end) |
-| 0007 | Dynamic-axes state injection scheme | Adopted (decision 6 revised by ADR 0062) |
+| 0007 | Dynamic-axes state injection scheme | Adopted (decisions 5 and 6 revised by ADR 0062) |
 | 0008 | Revoke runtime freezing of Axes / Origin / CoordinateSystem | Adopted (freezing mechanism rejected and reverted) |
 | 0009 | Enable spice feature for release wheels | Adopted (implemented) |
 | 0010 | r2s2 integration and TDT+GCRS ↔ TDB+EBCRS spacetime conversion | Adopted (implemented) |

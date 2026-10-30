@@ -447,7 +447,7 @@ class RelativeDynamics:
             各形状 ``(3,)``
 
         Raises:
-            ValueError: 参考体取值无效，或目标状态相对参考体退化
+            ValueError: 参考体取值无效、参考体位置无法确定，或目标状态相对参考体退化
         """
         rho_syn = np.asarray(rho_syn, dtype=float)
         dr_syn = rho_syn[:3]
@@ -455,7 +455,11 @@ class RelativeDynamics:
 
         target_state = self.target.state_at(t)
         # 星历系统没有 mu，默认双质心路径不访问它。
-        mu = None if reference is LVLHReference.BARYCENTER else self.dynamics.system.mu
+        mu = (
+            None
+            if reference is LVLHReference.BARYCENTER
+            else getattr(self.dynamics.system, "mu", None)
+        )
         body_position = reference_body_position(reference, mu)
         R = lvlh_basis(target_state[:3] - body_position, target_state[3:])
 
@@ -496,14 +500,18 @@ class RelativeDynamics:
             会合系相对状态 ``[δr, δv]``，形状 ``(6,)``
 
         Raises:
-            ValueError: 参考体取值无效，或目标状态相对参考体退化
+            ValueError: 参考体取值无效、参考体位置无法确定，或目标状态相对参考体退化
         """
         rho_lvlh = np.asarray(rho_lvlh, dtype=float)
         rho_dot_lvlh = np.asarray(rho_dot_lvlh, dtype=float)
 
         target_state = self.target.state_at(t)
         # 星历系统没有 mu，默认双质心路径不访问它。
-        mu = None if reference is LVLHReference.BARYCENTER else self.dynamics.system.mu
+        mu = (
+            None
+            if reference is LVLHReference.BARYCENTER
+            else getattr(self.dynamics.system, "mu", None)
+        )
         body_position = reference_body_position(reference, mu)
         R = lvlh_basis(target_state[:3] - body_position, target_state[3:])
 
