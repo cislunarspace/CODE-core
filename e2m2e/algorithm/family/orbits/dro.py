@@ -71,7 +71,8 @@ def _correct_dpo(dynamics: CR3BP_Dynamics, x0: float, guess: Orbit | None) -> Or
     """在近侧 x 轴穿越点 ``x0`` 处修正 DPO（固定 x0，自由 vy0 与半周期）。
 
     DPO 与 DRO 使用相同修正策略（``symmetric_2d_fixed_x0``），
-    但 vy0 < 0（顺行）。种子从反转 DRO vy0 的微分修正收敛获得。
+    但 vy0 < 0（顺行）。种子取自主族单圈延拓链上 10000 km 附近的
+    修正收敛成员，数值与闭合误差见 ``e2m2e/data/templates/seed.py``。
 
     DPO 族不稳定，族行走时 vy0 与 x0 的映射关系比 DRO 更非线性。
     首次调用（guess=None）使用种子常量；后续调用保留已收敛轨道的完整
