@@ -14,6 +14,7 @@ from .design import RO_SUPPORTED_RESONANCES, SEGMENTED_CORRECTION_ORBIT_TYPES
 from .enums import (
     BoundaryMode,
     LibrationPoint,
+    LVLHReference,
     OrbitFamilyType,
     ProjectionPlane,
     ReferenceFrame,
@@ -39,6 +40,7 @@ __all__ = [
     "RO_SUPPORTED_RESONANCES",
     "SEGMENTED_CORRECTION_ORBIT_TYPES",
     "ReferenceFrame",
+    "LVLHReference",
     "UnitSystem",
     "ProjectionPlane",
     "TransferType",

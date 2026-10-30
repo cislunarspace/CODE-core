@@ -29,7 +29,7 @@
 | 0004 | ForceModel config-driven | Adopted |
 | 0005 | TwoLevelMultipleShooting as an independent algorithm | Adopted (revoked 2026-08-13: implementation deleted, see revision at end) |
 | 0006 | Unified ephemeris-correction seam with registry dispatch | Adopted (revoked 2026-08-13: implementation deleted, see revision at end) |
-| 0007 | Dynamic-axes state injection scheme | Adopted |
+| 0007 | Dynamic-axes state injection scheme | Adopted (decision 6 revised by ADR 0062) |
 | 0008 | Revoke runtime freezing of Axes / Origin / CoordinateSystem | Adopted (freezing mechanism rejected and reverted) |
 | 0009 | Enable spice feature for release wheels | Adopted (implemented) |
 | 0010 | r2s2 integration and TDT+GCRS ↔ TDB+EBCRS spacetime conversion | Adopted (implemented) |
@@ -84,3 +84,4 @@
 | 0059 | CR3BP 多项式流，DA 算术传播内核 | 已采纳（已实现） |
 | 0060 | 共享全周期 PAL 数值内核与多圈闭合、三维非对称实例 | 已采纳（已实现） |
 | 0061 | DRO 振幅包络按族生成与轨道设计分开标定 | 已采纳（决策记录，实现随 #838） |
+| 0062 | LVLH 参考体选项与角动量符号约定 | 已采纳（实现随 #834） |

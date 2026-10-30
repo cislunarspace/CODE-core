@@ -7,8 +7,12 @@
 - :class:`TargetOrbit`：目标轨道包装，提供任意时刻状态查询
 - :class:`RelativeDynamics`：RLM 线性化 + 相对状态/STM 传播
 
-坐标系约定：相对状态默认在**会合系（Synodic）** 下定义（与 CR3BP 动力学
-同系），LVLH 转换由调用方经 :class:`~e2m2e.algorithm.coordinate.LVLHAxes` 完成。
+坐标系约定：相对状态默认在会合系（Synodic）下定义（与 CR3BP 动力学
+同系），LVLH 转换由 :meth:`RelativeDynamics.to_lvlh` 与
+:meth:`RelativeDynamics.from_lvlh` 提供，基构造与
+:class:`~e2m2e.algorithm.coordinate.LVLHAxes` 共用
+:func:`~e2m2e.algorithm.coordinate.lvlh_basis`。参考体默认双质心，可选
+地球与月球，只改变轴向，不改变相对状态的参考原点。
 """
 
 from __future__ import annotations
@@ -21,6 +25,9 @@ import numpy.typing as npt
 
 from e2m2e.integrators import RkMethod, solve_ivp_events
 
+from ...data.templates.enums import LVLHReference
+from ..coordinate.standard_dynamic_axes import lvlh_basis, reference_body_position
+
 if TYPE_CHECKING:
     from ...data.types.orbit import Orbit
 
@@ -32,7 +39,8 @@ class RelativeState:
     Attributes:
         rho: 相对位置，形状 ``(3,)``，无量纲（CR3BP DU）
         rho_dot: 相对速度，形状 ``(3,)``，无量纲（CR3BP DU/TU）
-        frame: 坐标系标签，``"Synodic"`` 或 ``"LVLH"``
+        frame: 坐标系标签，``"Synodic"`` 或 ``"LVLH"``。``"LVLH"`` 不记录
+            参考体，参考体由产生该状态的转换调用决定
         epoch: 参考历元（目标轨道时间坐标）
     """
 
@@ -402,60 +410,76 @@ class RelativeDynamics:
     # LVLH 系相对状态转换
     # ------------------------------------------------------------------
 
-    def to_lvlh(self, rho_syn: npt.ArrayLike, t: float) -> tuple[np.ndarray, np.ndarray]:
+    def to_lvlh(
+        self,
+        rho_syn: npt.ArrayLike,
+        t: float,
+        reference: LVLHReference = LVLHReference.BARYCENTER,
+    ) -> tuple[np.ndarray, np.ndarray]:
         """把会合系相对状态转换到 LVLH 系。
 
-        LVLH 系定义（`LVLHAxes`）：R = 径向，H = 角动量，V = H × R。
-        转换公式：
+        LVLH 系定义（`lvlh_basis`）：R = 径向，H = 角动量，V = H × R。
+        参考体默认双质心，可选主天体（地月系为地球）或次天体（地月系为
+        月球）。参考体只决定三根轴的方向，不改变输入相对状态 ``rho_syn``
+        的参考原点。转换公式：
 
             ρ_lvlh = Rᵀ δr_syn
             ρ̇_lvlh = Rᵀ δv_syn + Ṙᵀ δr_syn
 
-        其中 R 为目标轨道的 LVLH 旋转矩阵，Ṙ 用中心差分近似
+        其中 R 为目标轨道在参考体下的 LVLH 旋转矩阵，Ṙ 用中心差分近似
         （步长 1e-5，与 `Axes.rotation_and_rate` 一致）。
+
+        法向用会合速度，不用惯性相对速度。参考体为月球时会合角动量符号
+        在 2:1 DRO 上全程恒定，参考体为双质心时同一轨道的会合角动量在
+        t/T 约 0.21 与 0.79 过零并翻转基矢，惯性口径的月心角动量在
+        t/T 约 0.28 与 0.72 过零。公里级编队几何应选月球参考体。
+
+        参考体位置按 CR3BP 会合系常数计算，只适用于会合系状态，星历目标
+        请保持双质心默认。
 
         Args:
             rho_syn: 会合系相对状态 ``[δr, δv]``，形状 ``(6,)``
             t: 参考历元
+            reference: LVLH 参考体，默认双质心
 
         Returns:
             ``(rho_lvlh, rho_dot_lvlh)``：LVLH 系相对位置与速度，
             各形状 ``(3,)``
+
+        Raises:
+            ValueError: 参考体取值无效，或目标状态相对参考体退化
         """
         rho_syn = np.asarray(rho_syn, dtype=float)
         dr_syn = rho_syn[:3]
         dv_syn = rho_syn[3:]
 
-        # 目标轨道在 t 时刻的状态
         target_state = self.target.state_at(t)
-        r_target = target_state[:3]
-        v_target = target_state[3:]
+        body_position = reference_body_position(reference, self.dynamics.system.mu)
+        R = lvlh_basis(target_state[:3] - body_position, target_state[3:])
 
-        # LVLH 旋转矩阵（目标轨道）
-        R = _lvlh_rotation(r_target, v_target)
-
-        # R 的时间导数（中心差分）
         dt = 1e-5
         state_plus = self.target.state_at(t + dt)
         state_minus = self.target.state_at(t - dt)
-        R_plus = _lvlh_rotation(state_plus[:3], state_plus[3:])
-        R_minus = _lvlh_rotation(state_minus[:3], state_minus[3:])
+        R_plus = lvlh_basis(state_plus[:3] - body_position, state_plus[3:])
+        R_minus = lvlh_basis(state_minus[:3] - body_position, state_minus[3:])
         R_dot = (R_plus - R_minus) / (2.0 * dt)
 
-        # 位置转换
         rho_lvlh = R.T @ dr_syn
-
-        # 速度转换：ρ̇_lvlh = Rᵀ δv_syn + Ṙᵀ δr_syn
         rho_dot_lvlh = R.T @ dv_syn + R_dot.T @ dr_syn
 
         return rho_lvlh, rho_dot_lvlh
 
     def from_lvlh(
-        self, rho_lvlh: npt.ArrayLike, rho_dot_lvlh: npt.ArrayLike, t: float
+        self,
+        rho_lvlh: npt.ArrayLike,
+        rho_dot_lvlh: npt.ArrayLike,
+        t: float,
+        reference: LVLHReference = LVLHReference.BARYCENTER,
     ) -> np.ndarray:
         """把 LVLH 系相对状态转换回会合系。
 
-        逆转换：
+        参考体语义与 :meth:`to_lvlh` 相同，只改轴向，不改相对状态的参考
+        原点。逆转换：
 
             δr_syn = R ρ_lvlh
             δv_syn = R ρ̇_lvlh + Ṙ ρ_lvlh
@@ -464,42 +488,32 @@ class RelativeDynamics:
             rho_lvlh: LVLH 系相对位置，形状 ``(3,)``
             rho_dot_lvlh: LVLH 系相对速度，形状 ``(3,)``
             t: 参考历元
+            reference: LVLH 参考体，默认双质心
 
         Returns:
             会合系相对状态 ``[δr, δv]``，形状 ``(6,)``
+
+        Raises:
+            ValueError: 参考体取值无效，或目标状态相对参考体退化
         """
         rho_lvlh = np.asarray(rho_lvlh, dtype=float)
         rho_dot_lvlh = np.asarray(rho_dot_lvlh, dtype=float)
 
         target_state = self.target.state_at(t)
-        r_target = target_state[:3]
-        v_target = target_state[3:]
-        R = _lvlh_rotation(r_target, v_target)
+        body_position = reference_body_position(reference, self.dynamics.system.mu)
+        R = lvlh_basis(target_state[:3] - body_position, target_state[3:])
 
         dt = 1e-5
         state_plus = self.target.state_at(t + dt)
         state_minus = self.target.state_at(t - dt)
-        R_plus = _lvlh_rotation(state_plus[:3], state_plus[3:])
-        R_minus = _lvlh_rotation(state_minus[:3], state_minus[3:])
+        R_plus = lvlh_basis(state_plus[:3] - body_position, state_plus[3:])
+        R_minus = lvlh_basis(state_minus[:3] - body_position, state_minus[3:])
         R_dot = (R_plus - R_minus) / (2.0 * dt)
 
         dr_syn = R @ rho_lvlh
         dv_syn = R @ rho_dot_lvlh + R_dot @ rho_lvlh
 
         return np.concatenate([dr_syn, dv_syn])
-
-
-def _lvlh_rotation(r: np.ndarray, v: np.ndarray) -> np.ndarray:
-    """构造 LVLH 旋转矩阵 R = [r_hat, v_hat, h_hat]。
-
-    R = 径向，H = 角动量方向，V = H × R。
-    返回 (3, 3)，列为单位向量。
-    """
-    h = np.cross(r, v)
-    r_hat = r / np.linalg.norm(r)
-    h_hat = h / np.linalg.norm(h)
-    v_hat = np.cross(h_hat, r_hat)
-    return np.column_stack([r_hat, v_hat, h_hat])
 
 
 def _encke_f(q: float) -> float:

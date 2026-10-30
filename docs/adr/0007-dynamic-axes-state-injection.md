@@ -1,6 +1,6 @@
 # ADR 0007: Dynamic-axes state injection scheme
 
-**Status**: Adopted
+**Status**: Adopted (decision 6 revised by ADR 0062)
 **Date**: 2026-06-15
 **Related Issue**: Slice 12 (dynamic axes and VNB/LVLH maneuver support)
 
@@ -114,6 +114,12 @@ untouched.
    LVLH based on spacecraft's own state; `ObjectReferencedAxes` awaits a later
    slice, which will extend the `DynamicAxes.update` signature to accept body
    states.
+
+   Revision (2026-10-30, ADR 0062): the LVLH reference-body option is
+   implemented as a constructor parameter of `LVLHAxes` (reference body and
+   μ), not as a separate `ObjectReferencedAxes` class or an extended `update`
+   signature. CR3BP body positions are fixed and the proximity layer has no
+   body-state object. See ADR 0062 for the convention and the sign boundary.
 
 ## Rationale
 

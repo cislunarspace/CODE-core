@@ -12,7 +12,10 @@ from e2m2e.algorithm.coordinate.standard_dynamic_axes import (
     VELOCITY_NORM_MIN,
     LVLHAxes,
     VNBAxes,
+    lvlh_basis,
+    reference_body_position,
 )
+from e2m2e.data.templates.enums import LVLHReference
 
 pytestmark = pytest.mark.data
 
@@ -261,3 +264,112 @@ class TestDegenerateStates:
         msg = str(exc_info.value)
         assert "1.000e-13" in msg
         assert f"{ANGULAR_MOMENTUM_NORM_MIN:.1e}" in msg
+
+
+# ---------------------------------------------------------------------------
+# 参考体（#834）
+# ---------------------------------------------------------------------------
+
+MU_EARTH_MOON = 0.0121505856
+
+
+class TestLVLHReference:
+    """LVLHAxes 与 lvlh_basis 的参考体选项。"""
+
+    def test_reference_body_position_values(self):
+        """双质心在原点，主天体与次天体按 mu 定位。"""
+        np.testing.assert_allclose(reference_body_position(LVLHReference.BARYCENTER), np.zeros(3))
+        np.testing.assert_allclose(
+            reference_body_position(LVLHReference.PRIMARY, MU_EARTH_MOON),
+            [-MU_EARTH_MOON, 0.0, 0.0],
+        )
+        np.testing.assert_allclose(
+            reference_body_position(LVLHReference.SECONDARY, MU_EARTH_MOON),
+            [1.0 - MU_EARTH_MOON, 0.0, 0.0],
+        )
+
+    def test_reference_body_requires_mu(self):
+        """非双质心缺 mu 时构造与查询都报 ValueError。"""
+        with pytest.raises(ValueError, match="mu"):
+            LVLHAxes(reference=LVLHReference.SECONDARY)
+        with pytest.raises(ValueError, match="mu"):
+            reference_body_position(LVLHReference.PRIMARY)
+
+    def test_reference_body_rejects_invalid_mu(self):
+        """mu 不在 (0, 1) 内时报 ValueError。"""
+        with pytest.raises(ValueError, match="mu"):
+            reference_body_position(LVLHReference.SECONDARY, 0.0)
+        with pytest.raises(ValueError, match="mu"):
+            reference_body_position(LVLHReference.SECONDARY, 1.0)
+
+    def test_default_matches_barycenter(self):
+        """默认构造与显式双质心逐位一致。"""
+        default = LVLHAxes()
+        default.update(0.0, STATE_ARBITRARY)
+        explicit = LVLHAxes(reference=LVLHReference.BARYCENTER, mu=MU_EARTH_MOON)
+        explicit.update(0.0, STATE_ARBITRARY)
+        np.testing.assert_array_equal(default.rotation_matrix(0.0), explicit.rotation_matrix(0.0))
+
+    def test_moon_radial(self):
+        """次天体参考体的径向从月球指向目标。"""
+        state = np.array([0.8, 0.1, 0.0, 0.0, 1.0, 0.0])
+        axes = LVLHAxes(reference=LVLHReference.SECONDARY, mu=MU_EARTH_MOON)
+        axes.update(0.0, state)
+        r_rel = state[:3] - np.array([1.0 - MU_EARTH_MOON, 0.0, 0.0])
+        np.testing.assert_allclose(
+            axes.rotation_matrix(0.0)[:, 0],
+            r_rel / np.linalg.norm(r_rel),
+            atol=1e-14,
+        )
+
+    def test_earth_radial(self):
+        """主天体参考体的径向从地球指向目标。"""
+        state = np.array([0.8, 0.1, 0.0, 0.0, 1.0, 0.0])
+        axes = LVLHAxes(reference=LVLHReference.PRIMARY, mu=MU_EARTH_MOON)
+        axes.update(0.0, state)
+        r_rel = state[:3] - np.array([-MU_EARTH_MOON, 0.0, 0.0])
+        np.testing.assert_allclose(
+            axes.rotation_matrix(0.0)[:, 0],
+            r_rel / np.linalg.norm(r_rel),
+            atol=1e-14,
+        )
+
+    def test_reference_basis_orthonormal(self):
+        """三种参考体的旋转矩阵都正交且右手。"""
+        state = np.array([0.8, 0.1, 0.0, 0.0, 1.0, 0.0])
+        for reference in (
+            LVLHReference.BARYCENTER,
+            LVLHReference.PRIMARY,
+            LVLHReference.SECONDARY,
+        ):
+            axes = LVLHAxes(reference=reference, mu=MU_EARTH_MOON)
+            axes.update(0.0, state)
+            rotation = axes.rotation_matrix(0.0)
+            np.testing.assert_allclose(rotation @ rotation.T, np.eye(3), atol=1e-14)
+            assert np.linalg.det(rotation) == pytest.approx(1.0, abs=1e-14)
+
+    def test_lvlh_basis_matches_axes(self):
+        """共享基函数与 LVLHAxes 对同一相对状态给出相同矩阵。"""
+        state = np.array([0.8, 0.1, 0.0, 0.0, 1.0, 0.0])
+        body = reference_body_position(LVLHReference.SECONDARY, MU_EARTH_MOON)
+        expected = lvlh_basis(state[:3] - body, state[3:])
+        axes = LVLHAxes(reference=LVLHReference.SECONDARY, mu=MU_EARTH_MOON)
+        axes.update(0.0, state)
+        np.testing.assert_array_equal(expected, axes.rotation_matrix(0.0))
+
+    def test_moon_reference_zero_relative_position_raises(self):
+        """状态位于次天体位置时相对位置为零，报 ValueError。"""
+        state = np.array([1.0 - MU_EARTH_MOON, 0.0, 0.0, 0.0, 1.0, 0.0])
+        axes = LVLHAxes(reference=LVLHReference.SECONDARY, mu=MU_EARTH_MOON)
+        with pytest.raises(ValueError, match="位置为零"):
+            axes.update(0.0, state)
+
+    def test_lvlh_basis_zero_position_raises(self):
+        """共享基函数对零相对位置报 ValueError。"""
+        with pytest.raises(ValueError, match="位置为零"):
+            lvlh_basis(np.zeros(3), np.array([0.0, 1.0, 0.0]))
+
+    def test_unknown_reference_rejected(self):
+        """非枚举参考体被拒绝。"""
+        with pytest.raises(ValueError, match="参考体"):
+            LVLHAxes(reference="moon", mu=MU_EARTH_MOON)

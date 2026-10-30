@@ -1,9 +1,10 @@
 """Floquet 模态基础解集与有界性判据测试（主题 3）。
 
 测试轨道为 2:1 地月 DRO（月心近侧穿越 −0.192 LU，会合系 x0 = 1−μ−0.192，
-周期约 14.75 d）。论文数值（杨驰航等，航空学报 2023 年 44 卷 5 期 326563
-的式(13) 与特征值）属结果性对照，只进 docstring，不进断言；断言一律按
-物理定义（单位模、切向恒等、变分方程对拍、周期化闭合、有界性方向）。
+周期约 14.75 d）。论文特征值属结果性对照，只进 docstring，不进断言；
+式(13) 的切向基础解初值可按论文定义独立复算，作为定义性 oracle 在
+test_lvlh_reference_dro21.py 中断言。本文件的断言一律按物理定义
+（单位模、切向恒等、变分方程对拍、周期化闭合、有界性方向）。
 """
 
 from __future__ import annotations
@@ -13,7 +14,6 @@ import pytest
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics
 from e2m2e.algorithm.family import design_halo, design_lyapunov
-from e2m2e.algorithm.family.orbits.dro import _correct_dro
 from e2m2e.algorithm.family.orbits.walk import earth_moon_system
 from e2m2e.algorithm.proximity import FloquetModeError, floquet_modes
 from e2m2e.algorithm.proximity.relative_dynamics import RelativeDynamics, TargetOrbit
@@ -25,21 +25,6 @@ pytestmark = pytest.mark.orchestration
 #: 此处仅用于回归钉住收敛轨道本身）。
 _EIGENVALUE_IN_PLANE = complex(-0.742423, 0.669932)
 _EIGENVALUE_OUT_OF_PLANE = complex(0.139176, 0.990268)
-
-
-@pytest.fixture(scope="module")
-def dro21() -> tuple[Orbit, CR3BP_Dynamics]:
-    """2:1 地月 DRO 与地月动力学。"""
-    dynamics = CR3BP_Dynamics(earth_moon_system())
-    seed = _correct_dro(dynamics, 0.79188556619742, None)
-    orbit = _correct_dro(dynamics, (1.0 - dynamics.system.mu) - 0.192, seed)
-    return orbit, dynamics
-
-
-@pytest.fixture(scope="module")
-def modes21(dro21):
-    orbit, dynamics = dro21
-    return floquet_modes(orbit, dynamics)
 
 
 class TestClassification:

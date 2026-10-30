@@ -22,6 +22,19 @@ class ReferenceFrame(enum.Enum):
     EPPR = "eppr"  # 星历脉动旋转坐标系（Earth-Moon EPPR）
 
 
+class LVLHReference(enum.Enum):
+    """LVLH 轴的参考体。
+
+    决定径向从哪个参考点量起、角动量绕哪个参考点计算，不改变相对状态
+    自身的参考原点。``PRIMARY`` 与 ``SECONDARY`` 的位置按 CR3BP 会合系
+    常数取 (-μ, 0, 0) 与 (1-μ, 0, 0)，只适用于会合系状态。
+    """
+
+    BARYCENTER = "barycenter"  # 地月质心（默认，径向从质心量起）
+    PRIMARY = "primary"  # 主天体（地月系为地球）
+    SECONDARY = "secondary"  # 次天体（地月系为月球）
+
+
 class UnitSystem(enum.Enum):
     """单位系统"""
 

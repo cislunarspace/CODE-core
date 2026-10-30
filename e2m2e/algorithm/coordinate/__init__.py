@@ -37,7 +37,12 @@ from .standard_axes import (
     standard_icrf,
     standard_itrf,
 )
-from .standard_dynamic_axes import LVLHAxes, VNBAxes
+from .standard_dynamic_axes import (
+    LVLHAxes,
+    VNBAxes,
+    lvlh_basis,
+    reference_body_position,
+)
 from .standard_origins import CelestialBodyOrigin, InertialOrigin
 from .synodic_axes import SynodicAxes
 from .synodic_j2000 import SynodicJ2000System
@@ -58,6 +63,8 @@ __all__ = [
     "standard_itrf",
     "LVLHAxes",
     "VNBAxes",
+    "lvlh_basis",
+    "reference_body_position",
     "CelestialBodyOrigin",
     "InertialOrigin",
     "SynodicAxes",
