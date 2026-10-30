@@ -924,7 +924,9 @@ def locate_halo_multiplier_merges(
 
     Args:
         dynamics: CR3BP 动力学。
-        seed_orbit: 起始族成员，缺省用 L2 南 Halo 的 Richardson 种子。
+        seed_orbit: 起始族成员，缺省用 L2 南 Halo 的 Richardson 种子。成员带
+            ``parameters["libration_point"]`` 时校验必须为 L2，缺少该键时按 L2
+            南族处理并重新标注，调用方须自行确认传入的是 L2 族成员。
         max_members: 成员数上限（含种子）。
         step_size: PAL 伪弧长步长。
 

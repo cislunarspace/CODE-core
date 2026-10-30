@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics
-from e2m2e.algorithm.family.orbits.walk import earth_moon_system
+from e2m2e.algorithm.family.orbits.walk import Cr3bpOrbitError, earth_moon_system
 from e2m2e.algorithm.family.resonant_branch import (
     CRITICAL_MULTIPLIER_TOLERANCE,
     TRIVIAL_PROJECTION_TOLERANCE,
@@ -16,6 +16,7 @@ from e2m2e.algorithm.family.resonant_branch import (
     _is_startable,
     _prepare_halo_seed,
     _resonance_from_merge,
+    _tight_halo,
     classify_multiplier_pairs,
     locate_halo_multiplier_merges,
 )
@@ -89,6 +90,24 @@ def test_resonance_from_merge_maps_starting_point() -> None:
 
     complex_event = replace(event, eigenvector=np.array([1.0, 1.0j, 0.0, 0.0, 0.0, 0.0]))
     assert np.isrealobj(_resonance_from_merge(complex_event).eigenvector)
+
+
+@pytest.mark.theory
+def test_tight_halo_reports_failure(
+    monkeypatch: pytest.MonkeyPatch, dynamics: CR3BP_Dynamics
+) -> None:
+    """收紧失败时返回原成员并标记 False，端点不会被记成已达到精化容差。"""
+    orbit = Orbit(states=np.zeros((1, 6)), times=np.zeros(1), system=dynamics.system)
+    orbit.period = 2.4
+
+    def fail(*args: object, **kwargs: object) -> None:
+        raise Cr3bpOrbitError("固定 x0 修正未收敛")
+
+    monkeypatch.setattr("e2m2e.algorithm.family.resonant_branch._correct_halo_x0", fail)
+    tightened_orbit, tightened = _tight_halo(dynamics, orbit, None)
+
+    assert tightened is False
+    assert tightened_orbit is orbit
 
 
 @pytest.mark.theory
