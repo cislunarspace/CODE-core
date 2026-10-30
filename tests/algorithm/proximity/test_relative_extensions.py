@@ -194,6 +194,8 @@ class TestLVLH:
         rho_syn = np.array([1e-4, 2e-4, 1e-5, 1e-5, -1e-5, 0.0])
         with pytest.raises(ValueError, match="mu"):
             rd.to_lvlh(rho_syn, 1.5, reference=LVLHReference.SECONDARY)
+        with pytest.raises(ValueError, match="mu"):
+            rd.from_lvlh(np.zeros(3), np.zeros(3), 1.5, reference=LVLHReference.SECONDARY)
 
 
 class TestPhasing:
