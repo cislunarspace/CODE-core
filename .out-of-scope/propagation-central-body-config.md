@@ -39,10 +39,13 @@ fm = ForceModel.from_config(force_config, system)
 套进月心系静默算错；要安全就得再引入一套按中心天体派生的默认模型与一致性守卫。维护者判定
 这份自动化不值得引入：中心天体与力模型配置全部由调用方手工给，传输层保持地心原点不变。
 
-**已知边界**（现象记录，未立项）：`propagate_orbit` 的原点写死地心，也不校验力配置与原点是否
-自洽。把按非地心意图写的力配置交给它（例如地心系里的 `ThirdBodyGravity(EARTH)`，此时
-`r_i = 0` 退化），会得到地心系下的错误轨迹，且状态仍报 `CONVERGED`。调用方在传输层混用手工
-力配置前需自行确认原点一致。
+**已知边界**（已由 #845 关闭）：`propagate_orbit` 的原点仍写死地心，但 `ForceModel.from_config`
+现在按力类型校验力配置与原点的一致性。`PointMassGravity`、`DragModel` 与
+`RelativisticCorrection.central_body` 必须取原点，`ThirdBodyGravity` 与 `IndirectTerm` 必须取
+非原点天体，违反时抛 `ValueError`，传输层翻译为 `INVALID_PARAMS`。把按非地心意图写的力配置
+交给 `propagate_orbit` 会得到参数错误，不再返回 `CONVERGED` 的错误轨迹。未覆盖的边界有三类：
+`origin` 与 `params.body` 的名称与 NAIF ID 混用、绕过 `ForceModel.from_config` 直接装配力模型、
+配置缺少中心项或中心项重复。
 
 ## 复核路径
 
@@ -53,7 +56,12 @@ fm = ForceModel.from_config(force_config, system)
   领域词 `origin`）、默认力模型归属、以及原点与力配置不一致时的守卫策略；
 - 届时需先决定是否接受第二套默认力模型，否则只能提供字段 + 显式拒绝不匹配配置的组合。
 
+2026-10-30 复核（#845）：维持不给传输层加中心天体字段的结论。守卫落地后，切原点忘改力配置的
+风险已由参数错误拦截，字段只剩便利性。若将来 CLI/MCP 成为月心任务主入口，再按本节路径复议。
+
 ## 过往请求
 
 - [#666](https://github.com/cislunarspace/CODE-core/issues/666)：`PropagationRequest` 增加
   中心天体参数，`propagate_orbit` 与 `force_mapping` 按中心天体生成对称力配置
+- [#845](https://github.com/cislunarspace/CODE-core/issues/845)：复核本决定，要求先拒绝原点与
+  力配置不一致的请求，再评估 origin 字段。结论为维持不加字段，守卫随 #845 落地

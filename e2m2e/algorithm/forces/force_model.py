@@ -13,7 +13,12 @@ import numpy.typing as npt
 from e2m2e.exceptions import RustExtensionUnavailableError
 from e2m2e.integrators import RkMethod, require_rust_extension
 
+from .drag import DragModel
+from .indirect_term import IndirectTerm
 from .physical_model import PhysicalModel
+from .point_mass_gravity import PointMassGravity
+from .relativistic_correction import RelativisticCorrection
+from .third_body_gravity import ThirdBodyGravity
 from .thrust import BurnApplication, ImpulsiveBurn
 
 
@@ -24,6 +29,48 @@ class ForceEntry:
     name: str
     force: PhysicalModel
     enabled: bool = True
+
+
+def _validate_origin_consistency(force: PhysicalModel, origin: str | None, name: str) -> None:
+    """校验带天体参数的力与传播原点的角色关系。
+
+    中心项力（点质量引力、大气阻力、相对论修正的中心天体）必须取传播原点，
+    第三体引力与间接项必须取非原点天体。第三体引力以原点天体为摄动天体时，
+    该天体相对原点的位置为零，间接项消失、直接项退化为一份额外的中心引力。
+    此类配置物理上不成立，构建时拒绝，不进入传播。
+    """
+    if origin is None:
+        return
+    body = str(origin).upper()
+    if isinstance(force, ThirdBodyGravity) and force.body == body:
+        raise ValueError(
+            f"力配置条目 {name!r} 的 ThirdBodyGravity 以传播原点天体 {origin!r} 为摄动天体，"
+            "此时摄动天体相对原点的位置为零，间接项消失、直接项退化为一份额外中心引力。"
+            "请改为中心项力，或换用其他摄动天体。"
+        )
+    if isinstance(force, PointMassGravity) and force.body != body:
+        raise ValueError(
+            f"力配置条目 {name!r} 的 PointMassGravity 取天体 {force.body!r}，"
+            f"与传播原点 {origin!r} 不一致。点质量引力假定状态以该天体为原点，"
+            "非原点天体请改用 ThirdBodyGravity，球谐场景改用 GravityField 加 IndirectTerm。"
+        )
+    if isinstance(force, IndirectTerm) and force.body == body:
+        raise ValueError(
+            f"力配置条目 {name!r} 的 IndirectTerm 取传播原点天体 {origin!r}。"
+            "间接项扣除的是摄动天体对原点的引力，不能以原点天体本身为摄动天体。"
+        )
+    if isinstance(force, RelativisticCorrection) and force.central_body != body:
+        raise ValueError(
+            f"力配置条目 {name!r} 的 RelativisticCorrection.central_body 取天体 "
+            f"{force.central_body!r}，与传播原点 {origin!r} 不一致。"
+            "相对论修正以中心天体为参考，必须取传播原点。"
+        )
+    if isinstance(force, DragModel) and force.body != body:
+        raise ValueError(
+            f"力配置条目 {name!r} 的 DragModel 取天体 {force.body!r}，"
+            f"与传播原点 {origin!r} 不一致。大气阻力按该天体的大气模型与地固系"
+            "计算相对速度，必须取传播原点。"
+        )
 
 
 class ForceModel:
@@ -171,8 +218,9 @@ class ForceModel:
     def from_config(cls, config: dict[str, Any], system: Any) -> ForceModel:
         """从配置字典构建 ``ForceModel``。
 
-        校验 ``version``，逐条 ``force_config.build_force`` 构造并按 ``name``
-        注册；``enabled: false`` 的条目构造后立即 disable。
+        校验 ``version`` 与力配置和传播原点的一致性，逐条 ``force_config.build_force``
+        构造并按 ``name`` 注册；``enabled: false`` 的条目构造后立即 disable。原点一致性
+        不满足时抛 ``ValueError``，消息带条目名与冲突的天体。
         """
         from .force_config import build_force
 
@@ -182,10 +230,14 @@ class ForceModel:
                 f"unsupported config version {version!r}; expected {cls._CONFIG_VERSION}"
             )
         fm = cls(system)
+        origin = getattr(system, "origin", None)
         for entry in config.get("forces", []):
             force = build_force(entry["type"], entry.get("params", {}))
+            enabled = entry.get("enabled", True)
+            if enabled:
+                _validate_origin_consistency(force, origin, entry["name"])
             fm.add_force(force, name=entry["name"])
-            if not entry.get("enabled", True):
+            if not enabled:
                 fm.disable(entry["name"])
         return fm
 
