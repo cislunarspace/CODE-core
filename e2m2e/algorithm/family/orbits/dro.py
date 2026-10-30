@@ -61,11 +61,18 @@ def _correct_dro(dynamics: CR3BP_Dynamics, x0: float, guess: Orbit | None) -> Or
     return orbit
 
 
+def _dpo_winding_number(orbit: Orbit, x_moon: float) -> float:
+    """整周期内绕月方位角的累计变化除以 2π（顺行为正，多圈解为整数倍）。"""
+    angle = np.unwrap(np.arctan2(orbit.states[:, 1], orbit.states[:, 0] - x_moon))
+    return float((angle[-1] - angle[0]) / (2.0 * np.pi))
+
+
 def _correct_dpo(dynamics: CR3BP_Dynamics, x0: float, guess: Orbit | None) -> Orbit:
     """在近侧 x 轴穿越点 ``x0`` 处修正 DPO（固定 x0，自由 vy0 与半周期）。
 
     DPO 与 DRO 使用相同修正策略（``symmetric_2d_fixed_x0``），
-    但 vy0 < 0（顺行）。种子从反转 DRO vy0 的微分修正收敛获得。
+    但 vy0 < 0（顺行）。种子取自主族单圈延拓链上 10000 km 附近的
+    修正收敛成员，数值与闭合误差见 ``e2m2e/data/templates/seed.py``。
 
     DPO 族不稳定，族行走时 vy0 与 x0 的映射关系比 DRO 更非线性。
     首次调用（guess=None）使用种子常量；后续调用保留已收敛轨道的完整
@@ -75,7 +82,16 @@ def _correct_dpo(dynamics: CR3BP_Dynamics, x0: float, guess: Orbit | None) -> Or
     逆行支会收敛到逆行解；保留完整状态作初猜并不能杜绝（#587，打包
     baseline dpo 前 4 成员曾因此为逆行）。收敛后校验月心角动量顺行
     （h_z > 0），不满足按伪解同路径拒绝，交由族行走退半步重试。
+
+    固定 x0 的修正对同一 x0 还存在绕月多圈解（整周期内绕月 k 圈、
+    周期约 k 倍）。多圈解同样满足对称闭合条件，收敛初猜偏差稍大就会
+    落到多圈分支上（#841，旧种子本身即双圈解，20000 km 请求返回 7 圈
+    轨道）。伪解判据直接取整周期绕月圈数与 1 的偏差，多圈解按伪解
+    同路径拒绝，族行走退半步重试后仍在主族单圈分支上。
     """
+    if x0 >= 1.0 - dynamics.system.mu:
+        # 穿越点越过月球（对侧），已不在近侧 DPO 族参数域内
+        raise Cr3bpOrbitError(f"DPO x0={x0:.6f} 越过月心位置，超出族参数域")
     if guess is None:
         state = np.array([x0, 0.0, 0.0, 0.0, _DPO_SEED_VY0, 0.0])
         period = _DPO_SEED_PERIOD
@@ -90,20 +106,26 @@ def _correct_dpo(dynamics: CR3BP_Dynamics, x0: float, guess: Orbit | None) -> Or
     seed.period = period
     orbit = _correct_or_raise(corrector, seed, f"DPO(x0={x0:.6f})")
     assert orbit.period is not None
-    # DPO 族不稳定，周期变化幅度比 DRO 大；放宽伪解阈值以避免误杀
-    # 正常族行走中周期跳变到 2 倍以上才是真伪解（多圈对称周期轨道）
-    if orbit.period > 2.0 * period:
-        raise Cr3bpOrbitError(
-            f"DPO(x0={x0:.6f}) 修正跳到长周期伪解（T={orbit.period:.3f}，初猜 {period:.3f}）"
-        )
+    x_moon = 1.0 - dynamics.system.mu
     # 顺行分支校验（#587）：穿越点月心角动量 h_z = (x − x_moon)·vy 必须
     # 顺行（近侧 x0 < x_moon 即 vy0 < 0）；逆行支按伪解同路径拒绝
-    x_moon = 1.0 - dynamics.system.mu
     h_z = (float(orbit.states[0, 0]) - x_moon) * float(orbit.states[0, 4])
     if h_z <= 0.0:
         raise Cr3bpOrbitError(
             f"DPO(x0={x0:.6f}) 修正收敛到逆行支"
             f"（vy0={float(orbit.states[0, 4]):+.4f}，h_z={h_z:+.5f}）"
+        )
+    winding = _dpo_winding_number(orbit, x_moon)
+    if abs(winding - 1.0) > 0.05:
+        raise Cr3bpOrbitError(
+            f"DPO(x0={x0:.6f}) 修正收敛到 {winding:.0f} 圈分支（T={orbit.period:.3f}，主族为单圈）"
+        )
+    if abs(orbit.period / period - 1.0) > 0.3:
+        # 同一 x0 还存在另一条单圈顺行分支（周期明显更长、偏心率更大），
+        # 步长过大时牛顿迭代会跳过去；周期相对初猜突变即判跳支，交由
+        # 族行走退半步重试，与多圈伪解同一处理路径
+        raise Cr3bpOrbitError(
+            f"DPO(x0={x0:.6f}) 修正跳到另一条单圈分支（T={orbit.period:.3f}，初猜 {period:.3f}）"
         )
     return orbit
 
@@ -180,6 +202,8 @@ def design_dpo(
         dp_init=0.02,
         max_step=0.05,
         tol=tol_km / du,
+        step_growth=1.25,
+        max_iter=200,
     )
 
 

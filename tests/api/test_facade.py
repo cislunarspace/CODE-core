@@ -67,6 +67,13 @@ class TestFacadeValidation:
                 perilune_height=40000.1,
             )
 
+    @pytest.mark.spice
+    @requires_spice
+    def test_dpo_duration_over_rev_budget_is_translated_to_invalid_params(self):
+        """#841：DPO 超过两圈的时长在族行走后被拒绝，错误带单圈周期与上限。"""
+        with pytest.raises(OrbitError, match=r"(?s)INVALID_PARAMS.*最多覆盖 2 圈"):
+            Facade().design_orbit(orbit_type="DPO", amplitude=20000.0, duration=31557600.0)
+
 
 class TestFacadeDelegation:
     def test_control_upper_bounds_are_translated_to_orbit_error(self):

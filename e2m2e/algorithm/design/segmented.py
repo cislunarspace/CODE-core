@@ -120,8 +120,8 @@ def _revs_per_group_for(sel: str, n_rev: int) -> int:
     长段节点密、段内约束强，各段修到正确星历弧（对齐朱彦伟 2026）。
     NRHO 单独 1 圈/段：默认相位 0.5、约 1 个月弧上
     revs_per_group=3 合并层残差可卡在约 10² km；1 圈/段与等时间
-    采样组合下 GUI 默认量级收敛。DPO 的一个周期约 23 天，使用 64
-    点/圈时两圈同组可避免逐圈独立修正后的 seam 残差。
+    采样组合下 GUI 默认量级收敛。DPO 默认振幅的主族单圈成员周期约
+    3.33 天，使用 64 点/圈时两圈同组可避免逐圈独立修正后的 seam 残差。
     配合 var_time 固定时刻族（``_FIXED_TIME_ORBIT_TYPES``，含
     Halo/NRHO/DPO、拟周期族与 Axial）。
 

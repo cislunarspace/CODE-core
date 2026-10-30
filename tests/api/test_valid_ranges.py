@@ -75,8 +75,6 @@ class TestValidRangesResponse:
         response = Facade().valid_ranges()
         design_dro = response.design_orbit["DRO"]["amplitude"]
         assert (design_dro.minimum, design_dro.maximum) == (1737.0, 200000.0)
-        design_dpo = response.design_orbit["DPO"]["amplitude"]
-        assert (design_dpo.minimum, design_dpo.maximum) == (1737.0, 110000.0)
         family_min = response.family_generation_ranges["DRO"]["min_amplitude_km"]
         family_max = response.family_generation_ranges["DRO"]["max_amplitude_km"]
         assert (family_min.minimum, family_min.maximum) == (1737.0, 480000.0)
@@ -94,6 +92,16 @@ class TestValidRangesResponse:
         assert (family.min_amplitude_km, family.max_amplitude_km) == (150000.0, 480000.0)
         with pytest.raises(ValidationError, match="max_amplitude_km"):
             FamilyGenerationRequest(orbit_type="DRO", max_amplitude_km=480000.1)
+
+    def test_dpo_design_envelope_matches_validator_source(self):
+        """#841：DPO 设计上界 27000 km 是端到端实测可达点，与请求校验同源。"""
+        response = Facade().valid_ranges()
+        design_dpo = response.design_orbit["DPO"]["amplitude"]
+        assert (design_dpo.minimum, design_dpo.maximum) == (1737.0, 27000.0)
+        assert DesignOrbitRequest.valid_ranges("DPO")["amplitude"].maximum == 27000.0
+        assert DesignOrbitRequest(orbit_type="DPO", amplitude=27000.0).amplitude == 27000.0
+        with pytest.raises(ValidationError, match="amplitude"):
+            DesignOrbitRequest(orbit_type="DPO", amplitude=27000.1)
 
     def test_units_are_attached_per_field(self):
         response = Facade().valid_ranges()

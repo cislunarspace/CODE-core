@@ -27,11 +27,13 @@ _GLOBAL_AMPLITUDE_OUT_RANGES = _with_global_amplitude_out(_range_map())
 #: 上界来自 150000 到 200000 km、5000 km 步长的标定。175000 km 到
 #: 200000 km 的一年星历有界，150000 km 到 170000 km 属于逃逸带，其中
 #: 160000 km 的长期传播失败直接抛 DesignNotConvergedError，其余点返回
-#: DIVERGED 并发长期有界性告警。150000 km 以下未逐点复核。DPO 维持
-#: 原包络。
-#: 族生成侧另有独立包络。
+#: DIVERGED 并发长期有界性告警。150000 km 以下未逐点复核。DPO 的
+#: 27000 km 上界是 segmented 星历修正端到端实测到的最高振幅（#841）：
+#: 默认两圈 14.32 天 169 秒收敛，27500 km 成员在同样两圈下分段打靶
+#: 不收敛（残差 2.87e1 km）。CR3BP 族行走可走到 27752 km 的折叠极值，
+#: 设计侧不声明到那里。族生成侧另有独立包络。
 _DRO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 200000.0)))
-_DPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 110000.0)))
+_DPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 27000.0)))
 _SPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 200000.0)))
 _LPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1000.0, 110000.0)))
 #: RO（共振轨道）：五档精确成员分布在不同偏心族上，不能再用全比例
@@ -129,7 +131,12 @@ class DesignOrbitRequest(_ApiModel):
     # 传播参数
     epoch: Any = Field(default=(2024, 1, 1, 0, 0, 0.0), description="[年,月,日,时,分,秒] 或 ISO")
     duration: float | None = Field(
-        default=None, gt=0.0, description="传播时长（秒）；None 时按 orbit_type 填默认"
+        default=None,
+        gt=0.0,
+        description=(
+            "传播时长（秒）；None 时按 orbit_type 填默认。DPO 按修正后的单圈周期"
+            "取两圈，最多两圈，超过的请求被拒绝"
+        ),
     )
     output_step: float = Field(default=3600.0, gt=0.0)
     perturbation: dict[str, int] | None = Field(default=None)
@@ -215,8 +222,10 @@ class DesignOrbitRequest(_ApiModel):
     @model_validator(mode="after")
     def _validate_orbit_type(self) -> DesignOrbitRequest:
         sel = self.orbit_type.upper()
-        # duration 默认：CR3BP 1 年，ELFO 60 天
-        if self.duration is None:
+        # duration 默认：CR3BP 1 年，ELFO 60 天。DPO 由算法层按修正后的
+        # 单圈周期折算默认圈数（见 _resolve_dpo_duration），因为折算依赖
+        # 振幅决定的周期，模型层拿不到。
+        if self.duration is None and sel != "DPO":
             self.duration = 5184000.0 if sel == "ELFO" else 31557600.0
 
         if sel == "ELFO":

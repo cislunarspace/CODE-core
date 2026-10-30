@@ -39,6 +39,10 @@ class TestDesignOrbitRequest:
         assert dro.output_step == 3600.0
         assert dro.correction_method == "two_level"
 
+        # DPO 的时长由算法层按修正后的单圈周期折算圈数（#841）
+        dpo = DesignOrbitRequest(orbit_type="DPO")
+        assert dpo.duration is None
+
         lyapunov = DesignOrbitRequest(orbit_type="LYAPUNOV")
         assert (lyapunov.collinear_point, lyapunov.amplitude, lyapunov.phase) == (
             2,
@@ -82,7 +86,7 @@ class TestDesignOrbitRequest:
         ("orbit_type", "field", "minimum", "maximum", "minimum_inclusive"),
         [
             ("DRO", "amplitude", 1737.0, 200000.0, True),
-            ("DPO", "amplitude", 1737.0, 110000.0, True),
+            ("DPO", "amplitude", 1737.0, 27000.0, True),
             ("HALO", "amplitude", -77000.0, 77000.0, True),  # 无点默认 L2
             ("NRHO", "perilune_height", 100.0, 40000.0, True),
             ("L4", "amplitude_out", 0.0, 76000.0, False),
