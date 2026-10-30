@@ -21,8 +21,9 @@ spatial 起链走 butterfly 类非对称分支。
 方向与族切向），其数值分裂随成员闭合容差放大：PAL 原始成员的闭合只
 到 1e-7 量级时，平凡对可分裂成 1e-3 量级的实对或复对，不比真实临界
 乘子小。判别因此不得用“最接近 1 的乘子”，必须按特征向量投影把平凡
-对显式排除，再在非平凡对上跟踪 ν。扫描时逐成员用固定 x0 紧修正（闭
-合到 1e-13 量级），把平凡分裂压回数值噪声，追踪量才可靠。
+对显式排除，再在非平凡对上跟踪 ν。逐成员谱直接取 PAL 原始成员的行走
+状态，判别靠投影而不靠乘子接近度，平凡分裂的幅度因此不影响结论，只有
+精化端点用固定 x0 紧修正收紧到 1e-13 量级。
 """
 
 from __future__ import annotations
@@ -512,7 +513,7 @@ class HaloMergeScan:
     message: str
     #: 沿途记录到的全部 ±1 合并事件（按行走顺序）。
     events: tuple[MultiplierMerge, ...]
-    #: 首个 +1 合并构造的共振点；无 +1 合并时为 None。
+    #: 首个可起链的 +1 合并构造的共振点，没有可用横截方向时为 None。
     resonance: ResonancePoint | None
     #: 实际计算的成员数（含种子）。
     members_scanned: int
@@ -695,8 +696,7 @@ def _sign_changed(previous: float, current: float) -> bool:
 def _merge_pair(pairs: tuple[MultiplierPair, ...], kind: MergeKind) -> MultiplierPair:
     """取非平凡对中 ν 最接近目标的一对。"""
     nontrivial = [pair for pair in pairs if not pair.is_trivial]
-    pool = nontrivial or list(pairs)
-    return min(pool, key=lambda pair: abs(pair.nu - _merge_target(kind)))
+    return min(nontrivial, key=lambda pair: abs(pair.nu - _merge_target(kind)))
 
 
 def _pair_spectrum(
@@ -910,13 +910,13 @@ def locate_halo_multiplier_merges(
 
     Args:
         dynamics: CR3BP 动力学。
-        seed_orbit: 起始族成员；缺省用 L2 南 Halo 的 Richardson 种子。
+        seed_orbit: 起始族成员，缺省用 L2 南 Halo 的 Richardson 种子。
         max_members: 成员数上限（含种子）。
         step_size: PAL 伪弧长步长。
 
     Returns:
         :class:`HaloMergeScan`。定位到可起链的 +1 合并（横截方向不是流方
-        向或族切向）时状态为 CONVERGED；否则状态为 INFEASIBLE、原因为
+        向或族切向）时状态为 CONVERGED。否则状态为 INFEASIBLE、原因为
         NO_INTERSECTION，消息如实给出扫描区间、非平凡乘子对到 ±1 的最小
         偏差、终止情况与不可起链的原因。
     """
@@ -941,7 +941,7 @@ def locate_halo_multiplier_merges(
         seed_period = float(members[0].period)
         message = (
             f"沿 L2 南 Halo 族行走在 {len(members)} 条成员后提前中断（请求 {max_members} 条），"
-            f"不足以计算相邻成员间的乘子轨迹；种子 x0={seed_state[0]:.6f}，"
+            f"不足以计算相邻成员间的乘子轨迹。种子 x0={seed_state[0]:.6f}，"
             f"T={seed_period:.6f} TU"
         )
         return HaloMergeScan(
@@ -1049,6 +1049,7 @@ def locate_halo_multiplier_merges(
     ]
     resonance = _resonance_from_merge(usable[0]) if usable else None
     walked = len(members)
+    gap_text = f"{minimum_gap:.3e}" if math.isfinite(minimum_gap) else "未找到非平凡乘子对"
     termination = (
         f"PAL 延拓在 {walked} 条成员后提前中断（请求 {max_members} 条）"
         if walked < max_members
@@ -1061,7 +1062,7 @@ def locate_halo_multiplier_merges(
             f"[{parameter_interval[0]:.6f}, {parameter_interval[1]:.6f}]），定位到 "
             f"{len(plus_events)} 个乘子过 +1 的临界成员，首个可起链的在 x0="
             f"{first.parameter:.9f}（乘子偏差 {first.multiplier_gap:.3e}，"
-            f"ν={first.nu:.9f}，族切向投影 {first.tangent_projection:.3f}）；"
+            f"ν={first.nu:.9f}，族切向投影 {first.tangent_projection:.3f}）。"
             f"沿途记录 {len(minus_events)} 个过 −1 的合并"
         )
         status, cause = ConvergenceState.CONVERGED, FailureCause.NONE
@@ -1073,18 +1074,18 @@ def locate_halo_multiplier_merges(
             f"{len(plus_events)} 个乘子过 +1 的成员，但横截方向退化为流方向或族切向"
             f"（首个在 x0={first.parameter:.9f}，流方向投影 "
             f"{first.flow_projection:.3f}，族切向投影 {first.tangent_projection:.3f}），"
-            f"当前精化分辨率下未解析出对称破缺分支方向，未构造共振点；{termination}；"
+            f"当前精化分辨率下未解析出对称破缺分支方向，未构造共振点。"
+            f"非平凡乘子对到 ±1 的最小偏差为 {gap_text}。{termination}。"
             f"沿途记录 {len(minus_events)} 个过 −1 的合并"
         )
         status, cause = ConvergenceState.INFEASIBLE, FailureCause.NO_INTERSECTION
     else:
-        gap_text = f"{minimum_gap:.3e}" if math.isfinite(minimum_gap) else "未找到非平凡乘子对"
         message = (
             f"沿 L2 南 Halo 族扫描 {walked} 个成员（x0 区间 "
             f"[{parameter_interval[0]:.6f}, {parameter_interval[1]:.6f}]，周期区间 "
             f"[{period_interval[0]:.6f}, {period_interval[1]:.6f}] TU），未定位到乘子过 "
-            f"+1 的临界成员；非平凡乘子对到 ±1 的最小偏差为 {gap_text}；"
-            f"{termination}；沿途记录 {len(minus_events)} 个过 −1 的合并"
+            f"+1 的临界成员，非平凡乘子对到 ±1 的最小偏差为 {gap_text}。"
+            f"{termination}。沿途记录 {len(minus_events)} 个过 −1 的合并"
         )
         status, cause = ConvergenceState.INFEASIBLE, FailureCause.NO_INTERSECTION
     return HaloMergeScan(

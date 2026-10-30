@@ -87,6 +87,7 @@ def test_scan_reports_plus_one_merge_without_transverse_direction(scan) -> None:
     assert scan.status is ConvergenceState.INFEASIBLE
     assert scan.cause is FailureCause.NO_INTERSECTION
     assert "横截方向" in scan.message
+    assert "最小偏差" in scan.message
 
 
 @pytest.mark.orchestration
