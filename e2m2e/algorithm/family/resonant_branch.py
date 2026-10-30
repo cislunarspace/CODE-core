@@ -426,7 +426,7 @@ _REFINE_FRACTIONS = (0.5, 0.25, 0.75)
 #: 参考相位下对称破缺分量所在的状态分量（y、vx、vz）。
 _ANTISYMMETRIC_COMPONENTS = (1, 3, 5)
 
-#: 横截方向增广矩阵最小奇异值的上限：超过它说明成员不在 +1 合并处。
+#: 横截特征向量增广矩阵最小奇异值的上限：超过它说明成员不在 +1 合并处。
 _TRANSVERSE_SINGULAR_TOL = 0.5
 
 #: 复特征值与共轭配对的容差。
@@ -513,7 +513,7 @@ class HaloMergeScan:
     message: str
     #: 沿途记录到的全部 ±1 合并事件（按行走顺序）。
     events: tuple[MultiplierMerge, ...]
-    #: 首个可起链的 +1 合并构造的共振点，没有可用横截方向时为 None。
+    #: 首个可起链的 +1 合并构造的共振点，没有可用横截特征向量时为 None。
     resonance: ResonancePoint | None
     #: 实际计算的成员数（含种子）。
     members_scanned: int
@@ -724,10 +724,10 @@ def _tight_halo(dynamics: CR3BP_Dynamics, orbit: Orbit, guess: Orbit | None) -> 
 
 
 def _transverse_direction(matrix: np.ndarray, flow: np.ndarray) -> np.ndarray | None:
-    """求 +1 合并处分岔支的横截方向（对称破缺方向）。
+    """求 +1 合并处分岔支的横截特征向量（对称破缺方向）。
 
-    临界成员处单值矩阵在 λ=1 有约当链：流方向 f 在核空间，横截方向
-    v 满足 ``(M − I) v = c f``。相位条件 ``f·v = 0`` 排除沿流平移，
+    临界成员处单值矩阵在 λ=1 有约当链：流方向 f 在核空间，横截特征
+    向量 v 满足 ``(M − I) v = c f``。相位条件 ``f·v = 0`` 排除沿流平移，
     分岔支切向落在 7×7 增广矩阵 ``[[M − I, f], [fᵀ, 0]]`` 的零空间里。
     零空间可能同时含族切向（对称、纯 x/z/vy 分量），因此取零空间基底
     中反对称分量最大、且去掉流分量后仍非零的组合。零空间没有可用的反
@@ -915,8 +915,8 @@ def locate_halo_multiplier_merges(
         step_size: PAL 伪弧长步长。
 
     Returns:
-        :class:`HaloMergeScan`。定位到可起链的 +1 合并（横截方向不是流方
-        向或族切向）时状态为 CONVERGED。否则状态为 INFEASIBLE、原因为
+        :class:`HaloMergeScan`。定位到可起链的 +1 合并（横截特征向量不是
+        流方向或族切向）时状态为 CONVERGED。否则状态为 INFEASIBLE、原因为
         NO_INTERSECTION，消息如实给出扫描区间、非平凡乘子对到 ±1 的最小
         偏差、终止情况与不可起链的原因。
     """
@@ -1071,7 +1071,7 @@ def locate_halo_multiplier_merges(
         message = (
             f"沿 L2 南 Halo 族扫描 {walked} 个成员（x0 区间 "
             f"[{parameter_interval[0]:.6f}, {parameter_interval[1]:.6f}]），定位到 "
-            f"{len(plus_events)} 个乘子过 +1 的成员，但横截方向退化为流方向或族切向"
+            f"{len(plus_events)} 个乘子过 +1 的成员，但横截特征向量退化为流方向或族切向"
             f"（首个在 x0={first.parameter:.9f}，流方向投影 "
             f"{first.flow_projection:.3f}，族切向投影 {first.tangent_projection:.3f}），"
             f"当前精化分辨率下未解析出对称破缺分支方向，未构造共振点。"
@@ -1126,7 +1126,7 @@ def _prepare_halo_seed(dynamics: CR3BP_Dynamics, seed_orbit: Orbit | None) -> Or
 
 
 def _resonance_from_merge(event: MultiplierMerge) -> ResonancePoint:
-    """把首个可起链的 +1 合并事件转成共振点（单圈，横截方向作为起链方向）。"""
+    """把首个可起链的 +1 合并事件转成共振点（单圈，横截特征向量作为起链方向）。"""
     vector = np.asarray(event.eigenvector)
     if np.iscomplexobj(vector):
         vector = np.real(vector)

@@ -123,7 +123,7 @@ def main() -> int:
     _print_scan(scan)
     _print_trace(scan)
     if scan.resonance is None:
-        print("未构造共振点：横截方向不可用或无 +1 合并，无法起链")
+        print("未构造共振点：横截特征向量不可用或无 +1 合并，无法起链")
         return 1
     failures = 0
     for direction in BRANCH_DIRECTIONS:
