@@ -86,7 +86,7 @@ class TestDesignOrbitRequest:
         ("orbit_type", "field", "minimum", "maximum", "minimum_inclusive"),
         [
             ("DRO", "amplitude", 1737.0, 200000.0, True),
-            ("DPO", "amplitude", 1737.0, 27500.0, True),
+            ("DPO", "amplitude", 1737.0, 27000.0, True),
             ("HALO", "amplitude", -77000.0, 77000.0, True),  # 无点默认 L2
             ("NRHO", "perilune_height", 100.0, 40000.0, True),
             ("L4", "amplitude_out", 0.0, 76000.0, False),

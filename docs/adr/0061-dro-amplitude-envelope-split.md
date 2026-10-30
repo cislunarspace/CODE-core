@@ -105,7 +105,7 @@ issue #838 报告 `design_orbit` 与 `orbit_family_generation` 的 DRO 振幅域
 
 1. DPO 标准种子换成主族单圈成员：x0=0.96181641，vy0=−0.6578695709297038，周期 0.24919405111373913，振幅约 10007 km，闭合误差 4.19e-14。旧种子删除。
 2. `_correct_dpo` 的伪解判据改为整周期绕月圈数，非单圈解按伪解拒绝。周期相对初猜变化超过 30% 判为跳到同一 x0 的另一条单圈分支，同样拒绝。族行走遇拒绝退半步重试。`_walk_family` 的初始方向试探在对半缩减后再试，并新增可选步长增长（DPO 取 1.25，其余族默认固定步长，数值行为不变）。
-3. DPO 轨道设计振幅上界取 27500 km，低于折叠极值 27752 km 约 250 km，也低于设计侧行走实达边界 27550 km。请求模型与 `valid_ranges` 同源报告 1737 到 27500 km，越界请求在校验层确定性拒绝，不进入族行走。原决策 4 的 110000 km 与本节之前的 22500 至 23000 km 记录撤销。
+3. DPO 轨道设计振幅上界取 27000 km。CR3BP 族行走在 27500 km 仍收敛（距折叠极值 27752 km 约 250 km），但默认两圈的 segmented 星历修正在 27500 km 不收敛，27000 km 两圈 14.32 天 169 秒收敛，是端到端实测到的最高振幅。请求模型与 `valid_ranges` 同源报告 1737 到 27000 km，越界请求在校验层确定性拒绝，不进入族行走。原决策 4 的 110000 km 与本节之前的 22500 至 23000 km 记录撤销。
 4. 新增回归测试 `tests/algorithm/family/test_dpo_principal_branch.py`：20000 km 返回单圈主族成员（周期 0.70 至 0.85 TU），27500 km 稳定收敛且近月点在月面以上，闭合误差不超过 1e-10。
 
 不重建 packaged baseline dpo 的历史成员，既有数据保留。下次重新生成基线时 DPO 成员将按主族单圈分支输出，高振幅请求会在族行走中如实失败并跳过。
@@ -125,9 +125,20 @@ issue #838 报告 `design_orbit` 与 `orbit_family_generation` 的 DRO 振幅域
 
 30 天一行说明降低每圈节点数换不来可完成的长弧修正，因此不改 `_DPO_POINTS_PER_REV`。
 
+振幅上界另按默认两圈做端到端复核：
+
+| 振幅 km | 单圈周期 | 两圈时长 | 结果 |
+| --- | --- | --- | --- |
+| 20000 | 3.33 天 | 6.65 天 | 收敛，端到端 49.6 秒 |
+| 27000 | 7.16 天 | 14.32 天 | 收敛，端到端 168.7 秒 |
+| 27500 | 7.99 天 | 16.0 天 | 分段打靶段 1 未收敛，残差 2.869e1 km，321.9 秒 |
+
+族行走能到 27500 km，默认设置的星历修正不能，因此公开上界从 27500 km 收到 27000 km，与 DRO 取端到端实测可达点的口径一致。27500 km 的单圈请求（8 天）同样失败，残差与两圈一致，说明是该成员的星历转换不可收敛，不是时长问题。复核脚本 `scripts/verify_dpo_design_envelope.py` 可复跑 20000、27000 与 27500 三点。
+
 决策更新：
 
 1. DPO 的默认时长从一年改为两圈，由算法层按修正后的单圈周期折算（`_resolve_dpo_duration`），请求模型的 `duration` 对 DPO 保持 `None`。折算依赖振幅决定的周期，模型层拿不到。
 2. DPO 的时长上限取两圈，超过时在参数层抛 `ValueError`，报出该成员的单圈周期、时长上限、当前请求。原先一年默认在默认振幅下对应 110 圈，实测无法完成，声明与可实现能力不符。
-3. 新增端到端测试 `tests/algorithm/design/test_design_orbit_smoke.py::test_design_orbit_dpo_default_rev_budget_smoke`、时长边界测试 `tests/algorithm/design/test_dpo_duration_budget.py` 与 Facade 层的 `tests/api/test_facade.py` 拒绝用例，钉住默认请求的收敛、时长为两圈以及超限请求的 INVALID_PARAMS 翻译。
-4. 长弧 DPO 星历要求 segmented 修正改用规模随圈数线性增长的求解方式，属独立数值工作，不在本 PR 内完成。
+3. DPO 轨道设计振幅上界从 27500 km 收到 27000 km，请求模型与 `valid_ranges` 同源，越界请求在校验层确定性拒绝。
+4. 新增端到端测试 `tests/algorithm/design/test_design_orbit_smoke.py::test_design_orbit_dpo_default_rev_budget_smoke`、时长边界测试 `tests/algorithm/design/test_dpo_duration_budget.py` 与 Facade 层的 `tests/api/test_facade.py` 拒绝用例，钉住默认振幅 20000 km 的收敛、时长为两圈以及超限请求的 INVALID_PARAMS 翻译。上界 27000 km 与上界外 27500 km 由 `scripts/verify_dpo_design_envelope.py` 复核。
+5. 长弧 DPO 星历要求 segmented 修正改用规模随圈数线性增长的求解方式，属独立数值工作，不在本 PR 内完成。

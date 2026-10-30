@@ -28,11 +28,12 @@ _GLOBAL_AMPLITUDE_OUT_RANGES = _with_global_amplitude_out(_range_map())
 #: 200000 km 的一年星历有界，150000 km 到 170000 km 属于逃逸带，其中
 #: 160000 km 的长期传播失败直接抛 DesignNotConvergedError，其余点返回
 #: DIVERGED 并发长期有界性告警。150000 km 以下未逐点复核。DPO 的
-#: 27500 km 上界来自主族单圈分支的自然参数延拓（#841）：振幅在
-#: 27752 km 处到达折叠极值，27500 km 留约 250 km 余量，更接近折叠点
-#: 的请求会因修正失效返回不可行错误。族生成侧另有独立包络。
+#: 27000 km 上界是 segmented 星历修正端到端实测到的最高振幅（#841）：
+#: 默认两圈 14.32 天 169 秒收敛，27500 km 成员在同样两圈下分段打靶
+#: 不收敛（残差 2.87e1 km）。CR3BP 族行走可走到 27752 km 的折叠极值，
+#: 设计侧不声明到那里。族生成侧另有独立包络。
 _DRO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 200000.0)))
-_DPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 27500.0)))
+_DPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 27000.0)))
 _SPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 200000.0)))
 _LPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1000.0, 110000.0)))
 #: RO（共振轨道）：五档精确成员分布在不同偏心族上，不能再用全比例

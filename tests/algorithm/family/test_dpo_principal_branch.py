@@ -2,10 +2,11 @@
 
 旧种子（x0=0.90，T=2.5022）本身是双圈解，族行走从小振幅端就沿多圈
 分支收敛：20000 km 返回 7 圈轨道（T≈23.3 天），21000/22000 km 返回
-3/4 圈。主族单圈分支的自然参数延拓给出振幅折叠极值 27752 km，请求
-包络取 27500 km。本文件钉住：20000 km 返回单圈主族成员、接近上界的
-27500 km 仍收敛、主族成员整周期绕月恰好一圈，以及多圈解与周期突变
-两条拒绝分支确实被触发。
+3/4 圈。主族单圈分支的自然参数延拓给出振幅折叠极值 27752 km，族行走
+在 27500 km 仍收敛；设计请求包络取 27000 km，由 design_orbit 的端到端
+用例覆盖。本文件钉住：20000 km 返回单圈主族成员、族行走在接近折叠
+极值的 27500 km 仍收敛、主族成员整周期绕月恰好一圈，以及多圈解与
+周期突变两条拒绝分支确实被触发。
 """
 
 from __future__ import annotations
@@ -63,7 +64,7 @@ def test_20000_km_returns_single_rev_principal_member() -> None:
 
 
 def test_near_upper_bound_27500_km_converges() -> None:
-    """请求包络上界 27500 km 距折叠极值 27752 km 约 250 km，仍应稳定收敛。"""
+    """族行走在 27500 km 收敛，距折叠极值 27752 km 约 250 km。"""
     dynamics = CR3BP_Dynamics(earth_moon_system())
     lu = dynamics.system.characteristic_length
     assert lu is not None
