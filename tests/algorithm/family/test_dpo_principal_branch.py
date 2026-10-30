@@ -30,13 +30,6 @@ from e2m2e.data.types.orbit import Orbit
 pytestmark = pytest.mark.orchestration
 
 
-def _winding_number(orbit: Orbit) -> float:
-    """整周期内绕月方位角的累计变化除以 2π（主族单圈顺行为 +1）。"""
-    x_moon = 1.0 - orbit.system.mu
-    angle = np.unwrap(np.arctan2(orbit.states[:, 1], orbit.states[:, 0] - x_moon))
-    return float((angle[-1] - angle[0]) / (2.0 * np.pi))
-
-
 def _seed_guess(dynamics: CR3BP_Dynamics, period: float) -> Orbit:
     """种子状态配指定周期，用于构造拒绝分支的初猜。"""
     state = np.array([_DPO_SEED_X0, 0.0, 0.0, 0.0, _DPO_SEED_VY0, 0.0])
@@ -54,7 +47,7 @@ def test_20000_km_returns_single_rev_principal_member() -> None:
     orbit = design_dpo(20_000.0, dynamics=dynamics)
     d_min, d_max = _moon_distance_minmax(dynamics, orbit)
     assert abs(0.5 * (d_min + d_max) * lu - 20_000.0) <= 20.0
-    assert abs(_winding_number(orbit) - 1.0) < 0.05
+    assert abs(_dpo_winding_number(orbit, 1.0 - orbit.system.mu) - 1.0) < 0.05
     assert orbit.period is not None
     # 主族 20000 km 成员周期约 0.77 TU（3.33 天）；多圈伪解在 5 TU 以上，
     # 另一条单圈分支周期明显更长
@@ -72,7 +65,7 @@ def test_near_upper_bound_27500_km_converges() -> None:
     orbit = design_dpo(27_500.0, dynamics=dynamics)
     d_min, d_max = _moon_distance_minmax(dynamics, orbit)
     assert abs(0.5 * (d_min + d_max) * lu - 27_500.0) <= 20.0
-    assert abs(_winding_number(orbit) - 1.0) < 0.05
+    assert abs(_dpo_winding_number(orbit, 1.0 - orbit.system.mu) - 1.0) < 0.05
     # 近上界成员已相当偏心（近月点约 7000 km），仍在月面以上
     assert d_min * lu > 1737.0
     assert orbit.closure_error is not None

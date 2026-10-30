@@ -156,17 +156,21 @@ def _walk_family(
     if abs(m - target) <= tol:
         return orbit
 
-    # 一步试探确定 measure 随 p 的增减方向；大步长在族参数陡峭段
-    # （如 DPO 小振幅端）会修正失败，与行走同样对半缩减后再试
+    # 一步试探确定 measure 随 p 的增减方向；显式启用步长增长的族（DPO）
+    # 在大步长失败时对半缩减重试，其余族保持一次试探失败即抛出原错误
     probe_step = dp_init
     while True:
         try:
             probe = correct_at(p_seed + probe_step, orbit)
             break
-        except Cr3bpOrbitError:
+        except Cr3bpOrbitError as exc:
+            if step_growth <= 1.0:
+                raise
             probe_step *= 0.5
             if probe_step < 1e-4:
-                raise Cr3bpOrbitError("试探步长已减至最小仍修正失败，无法确定行走方向") from None
+                raise Cr3bpOrbitError(
+                    f"试探步长已减至最小仍修正失败（最后原因：{exc}），无法确定行走方向"
+                ) from exc
     m_probe = measure(probe)
     slope = (m_probe - m) / probe_step
     if slope == 0.0:

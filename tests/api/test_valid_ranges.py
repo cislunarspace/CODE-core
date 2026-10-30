@@ -93,6 +93,16 @@ class TestValidRangesResponse:
         with pytest.raises(ValidationError, match="max_amplitude_km"):
             FamilyGenerationRequest(orbit_type="DRO", max_amplitude_km=480000.1)
 
+    def test_dpo_design_envelope_matches_validator_source(self):
+        """#841：DPO 设计上界 27000 km 是端到端实测可达点，与请求校验同源。"""
+        response = Facade().valid_ranges()
+        design_dpo = response.design_orbit["DPO"]["amplitude"]
+        assert (design_dpo.minimum, design_dpo.maximum) == (1737.0, 27000.0)
+        assert DesignOrbitRequest.valid_ranges("DPO")["amplitude"].maximum == 27000.0
+        assert DesignOrbitRequest(orbit_type="DPO", amplitude=27000.0).amplitude == 27000.0
+        with pytest.raises(ValidationError, match="amplitude"):
+            DesignOrbitRequest(orbit_type="DPO", amplitude=27000.1)
+
     def test_units_are_attached_per_field(self):
         response = Facade().valid_ranges()
         # 单位属于字段：长度量 km，无量纲/计数值缺省

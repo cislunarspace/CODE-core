@@ -89,6 +89,9 @@ def _correct_dpo(dynamics: CR3BP_Dynamics, x0: float, guess: Orbit | None) -> Or
     轨道）。伪解判据直接取整周期绕月圈数与 1 的偏差，多圈解按伪解
     同路径拒绝，族行走退半步重试后仍在主族单圈分支上。
     """
+    if x0 >= 1.0 - dynamics.system.mu:
+        # 穿越点越过月球（对侧），已不在近侧 DPO 族参数域内
+        raise Cr3bpOrbitError(f"DPO x0={x0:.6f} 越过月心位置，超出族参数域")
     if guess is None:
         state = np.array([x0, 0.0, 0.0, 0.0, _DPO_SEED_VY0, 0.0])
         period = _DPO_SEED_PERIOD
