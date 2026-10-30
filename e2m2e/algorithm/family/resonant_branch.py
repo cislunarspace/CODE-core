@@ -890,6 +890,20 @@ class _Crossing:
     high_index: int
 
 
+def _is_startable(event: MultiplierMerge) -> bool:
+    """判断一个 +1 合并能否用于起链。
+
+    横截特征向量与流方向、族切向的投影都要低于判别阈值，事件达到精化
+    容差，乘子偏差也在 ``CRITICAL_MULTIPLIER_TOLERANCE`` 以内：下游
+    ``generate_resonant_branch_family`` 对超出该门限的共振点直接拒绝。
+    """
+    return (
+        max(event.flow_projection, event.tangent_projection) < TRIVIAL_PROJECTION_TOLERANCE
+        and event.refined
+        and event.multiplier_gap <= CRITICAL_MULTIPLIER_TOLERANCE
+    )
+
+
 def locate_halo_multiplier_merges(
     dynamics: CR3BP_Dynamics,
     *,
@@ -915,10 +929,11 @@ def locate_halo_multiplier_merges(
         step_size: PAL 伪弧长步长。
 
     Returns:
-        :class:`HaloMergeScan`。定位到可起链的 +1 合并（横截特征向量不是
-        流方向或族切向）时状态为 CONVERGED。否则状态为 INFEASIBLE、原因为
-        NO_INTERSECTION，消息如实给出扫描区间、非平凡乘子对到 ±1 的最小
-        偏差、终止情况与不可起链的原因。
+        :class:`HaloMergeScan`。定位到可起链的 +1 合并（横截特征向量与流
+        方向、族切向的投影都低于判别阈值，事件达到精化容差，乘子偏差不
+        超过 ``CRITICAL_MULTIPLIER_TOLERANCE``）时状态为 CONVERGED。否则
+        状态为 INFEASIBLE、原因为 NO_INTERSECTION，消息如实给出扫描区间、
+        非平凡乘子对到 ±1 的最小偏差、终止情况与不可起链的原因。
     """
     if max_members < 2:
         raise ValueError(f"max_members 必须大于 1，当前为 {max_members}")
@@ -1042,11 +1057,7 @@ def locate_halo_multiplier_merges(
     )
     plus_events = [event for event in events if event.kind == "+1"]
     minus_events = [event for event in events if event.kind == "-1"]
-    usable = [
-        event
-        for event in plus_events
-        if max(event.flow_projection, event.tangent_projection) < TRIVIAL_PROJECTION_TOLERANCE
-    ]
+    usable = [event for event in plus_events if _is_startable(event)]
     resonance = _resonance_from_merge(usable[0]) if usable else None
     walked = len(members)
     gap_text = f"{minimum_gap:.3e}" if math.isfinite(minimum_gap) else "未找到非平凡乘子对"
@@ -1068,15 +1079,17 @@ def locate_halo_multiplier_merges(
         status, cause = ConvergenceState.CONVERGED, FailureCause.NONE
     elif plus_events:
         first = plus_events[0]
+        refined_text = "达到" if first.refined else "未达到"
         message = (
             f"沿 L2 南 Halo 族扫描 {walked} 个成员（x0 区间 "
             f"[{parameter_interval[0]:.6f}, {parameter_interval[1]:.6f}]），定位到 "
-            f"{len(plus_events)} 个乘子过 +1 的成员，但横截特征向量退化为流方向或族切向"
-            f"（首个在 x0={first.parameter:.9f}，流方向投影 "
-            f"{first.flow_projection:.3f}，族切向投影 {first.tangent_projection:.3f}），"
-            f"当前精化分辨率下未解析出对称破缺分支方向，未构造共振点。"
-            f"非平凡乘子对到 ±1 的最小偏差为 {gap_text}。{termination}。"
-            f"沿途记录 {len(minus_events)} 个过 −1 的合并"
+            f"{len(plus_events)} 个乘子过 +1 的成员，但没有可起链的成员：要求横截特征向量"
+            f"与流方向、族切向的投影都低于 {TRIVIAL_PROJECTION_TOLERANCE:.2f}，事件达到精化"
+            f"容差，乘子偏差不超过 {CRITICAL_MULTIPLIER_TOLERANCE:.0e}。首个事件在 "
+            f"x0={first.parameter:.9f}，流方向投影 {first.flow_projection:.3f}，族切向投影 "
+            f"{first.tangent_projection:.3f}，精化容差{refined_text}，乘子偏差 "
+            f"{first.multiplier_gap:.3e}。非平凡乘子对到 ±1 的最小偏差为 {gap_text}。"
+            f"{termination}。沿途记录 {len(minus_events)} 个过 −1 的合并"
         )
         status, cause = ConvergenceState.INFEASIBLE, FailureCause.NO_INTERSECTION
     else:

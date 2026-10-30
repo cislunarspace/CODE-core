@@ -8,7 +8,10 @@ import pytest
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics
 from e2m2e.algorithm.family.orbits.walk import earth_moon_system
 from e2m2e.algorithm.family.resonant_branch import (
+    CRITICAL_MULTIPLIER_TOLERANCE,
     TRIVIAL_PROJECTION_TOLERANCE,
+    MultiplierMerge,
+    _is_startable,
     classify_multiplier_pairs,
     locate_halo_multiplier_merges,
 )
@@ -31,6 +34,40 @@ def _synthetic_monodromy() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     )
     matrix = eigenvectors @ np.diag(eigenvalues) @ np.linalg.inv(eigenvectors)
     return np.real(matrix), flow, tangent
+
+
+def _synthetic_merge(
+    *, refined: bool, gap: float = 1e-4, projection: float = 0.1
+) -> MultiplierMerge:
+    """构造一个 +1 合并事件，只暴露起链判定关心的三个量。"""
+    return MultiplierMerge(
+        kind="+1",
+        parameter=1.082868,
+        member_index=138,
+        state=np.zeros(6),
+        period=2.382171,
+        multiplier=1.0 + gap,
+        multiplier_gap=gap,
+        nu=2.0,
+        eigenvector=np.array([0.0, 1.0, 0.0, 0.0, 0.0, 0.0]),
+        flow_projection=projection,
+        tangent_projection=projection,
+        bracket=(1.082349, 1.082935),
+        refined=refined,
+    )
+
+
+@pytest.mark.theory
+def test_startable_requires_refined_gap_and_projection() -> None:
+    """起链判定同时要求方向可分、精化达标与乘子偏差在拒绝门限内。"""
+    assert _is_startable(_synthetic_merge(refined=True))
+    assert not _is_startable(_synthetic_merge(refined=False))
+    assert not _is_startable(
+        _synthetic_merge(refined=True, gap=2.0 * CRITICAL_MULTIPLIER_TOLERANCE)
+    )
+    assert not _is_startable(
+        _synthetic_merge(refined=True, projection=TRIVIAL_PROJECTION_TOLERANCE)
+    )
 
 
 @pytest.mark.theory
