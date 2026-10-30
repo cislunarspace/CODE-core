@@ -733,7 +733,7 @@ def _resolve_dpo_duration(period: float, t_c: float, requested: float | None) ->
     Args:
         period: 修正后的单圈周期（无量纲时间单位 TU）。
         t_c: 特征时间（秒）。
-        requested: 调用方给出的时长（秒）；``None`` 表示用默认圈数。
+        requested: 调用方给出的时长（秒）。``None`` 表示用默认圈数。
 
     Returns:
         解析后的传播时长（秒）。
