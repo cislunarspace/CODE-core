@@ -48,6 +48,17 @@ def circular_orbit(earth_moon_dynamics):
     return orbit, dynamics
 
 
+class _EphemerisLikeSystem:
+    """星历系统没有 mu 属性。"""
+
+
+class _EphemerisLikeDynamics:
+    """只提供 system 的动力学替身，用于钉住默认路径不读取 mu。"""
+
+    def __init__(self) -> None:
+        self.system = _EphemerisLikeSystem()
+
+
 class TestEncke:
     """Encke 式相对运动。"""
 
@@ -161,6 +172,18 @@ class TestLVLH:
         explicit_lvlh, explicit_dot = rd.to_lvlh(rho_syn, t, reference=LVLHReference.BARYCENTER)
         np.testing.assert_array_equal(default_lvlh, explicit_lvlh)
         np.testing.assert_array_equal(default_dot, explicit_dot)
+
+    def test_default_reference_does_not_require_mu(self, circular_orbit):
+        """星历目标没有 system.mu 时，默认双质心转换仍可用。"""
+        orbit, _ = circular_orbit
+        target = TargetOrbit(orbit)
+        rd = RelativeDynamics(target, _EphemerisLikeDynamics())
+
+        t = 1.5
+        rho_syn = np.array([1e-4, 2e-4, 1e-5, 1e-5, -1e-5, 0.0])
+        rho_lvlh, rho_dot_lvlh = rd.to_lvlh(rho_syn, t)
+        rho_syn_back = rd.from_lvlh(rho_lvlh, rho_dot_lvlh, t)
+        np.testing.assert_allclose(rho_syn, rho_syn_back, rtol=1e-10, atol=1e-15)
 
 
 class TestPhasing:

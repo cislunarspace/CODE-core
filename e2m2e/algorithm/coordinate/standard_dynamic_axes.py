@@ -149,7 +149,9 @@ class LVLHAxes(DynamicAxes):
 
     参考体默认双质心，此时径向从会合系原点量起，行为与旧版一致。可选
     主天体（地月系为地球）或次天体（地月系为月球），此时 ``mu`` 必填。
-    参考体只改变轴向，不改变传入状态自身的参考原点。
+    参考体只改变轴向，不改变传入状态自身的参考原点。参考体位置按
+    CR3BP 会合系常数计算，只适用于会合系状态，星历目标请保持双质心
+    默认。
 
     法向用会合速度。参考体为月球时会合角动量符号在 2:1 DRO 上全程恒定，
     参考体为双质心时同一轨道的会合角动量在 t/T 约 0.21 与 0.79 过零并
@@ -171,8 +173,6 @@ class LVLHAxes(DynamicAxes):
         mu: float | None = None,
     ) -> None:
         super().__init__()
-        self.reference = reference
-        self.mu = mu
         self._reference_position = reference_body_position(reference, mu)
 
     def update(self, t: float, state: npt.NDArray[np.floating]) -> None:

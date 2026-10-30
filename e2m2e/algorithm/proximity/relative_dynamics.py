@@ -454,7 +454,12 @@ class RelativeDynamics:
         dv_syn = rho_syn[3:]
 
         target_state = self.target.state_at(t)
-        body_position = reference_body_position(reference, self.dynamics.system.mu)
+        body_position: npt.NDArray[np.floating]
+        if reference is LVLHReference.BARYCENTER:
+            # 星历系统没有 mu，默认双质心路径不访问它。
+            body_position = np.zeros(3)
+        else:
+            body_position = reference_body_position(reference, self.dynamics.system.mu)
         R = lvlh_basis(target_state[:3] - body_position, target_state[3:])
 
         dt = 1e-5
@@ -500,7 +505,12 @@ class RelativeDynamics:
         rho_dot_lvlh = np.asarray(rho_dot_lvlh, dtype=float)
 
         target_state = self.target.state_at(t)
-        body_position = reference_body_position(reference, self.dynamics.system.mu)
+        body_position: npt.NDArray[np.floating]
+        if reference is LVLHReference.BARYCENTER:
+            # 星历系统没有 mu，默认双质心路径不访问它。
+            body_position = np.zeros(3)
+        else:
+            body_position = reference_body_position(reference, self.dynamics.system.mu)
         R = lvlh_basis(target_state[:3] - body_position, target_state[3:])
 
         dt = 1e-5
