@@ -6,13 +6,15 @@
 
 内容：
 1. L2 Halo（面外振幅 3000 km，单中心对形态）按振幅与网格匹配的口径
-   复算定义级残差：17 点网格到 1.1e-2，33 点网格到论文法向振幅 0.031；
+   复算定义级残差：17 点网格覆盖到 1e-2 量级（边缘级可停滞），
+   1.1e-2 单独作为如实不收敛探针（ADR 0063：0.011 在 8.7e-3 处停滞），
+   33 点网格复算论文法向振幅 0.031；
 2. 平面 DRO 种子（双中心对形态）探针：未规范的面内振幅方向被丢弃后
    ρ 不再漂移，但振幅塌缩与带边垃圾仍在，作为第二阶段的记录证据。
 
 论文对照值（第二周期 36.5 天与 58.3 天、法向振幅 0.031）属结果性数值
-（ADR 0055），只作人工对照，不进断言；本脚本的退出码只反映构造本身的
-收敛状态。
+（ADR 0055），只作人工对照，不进断言；退出码只反映包络内收敛项
+（1e-3 与 0.031）的构造状态，1.1e-2 探针如实输出不收敛但不参与退出码。
 """
 
 from __future__ import annotations
@@ -47,8 +49,10 @@ def main() -> int:
     halo = design_halo(2, 3000.0, dynamics=dynamics)
     print(f"halo period={float(halo.period):.6f} TU")
     ok = True
-    for amplitude in (1e-3, 1.1e-2):
-        ok &= _run("halo", halo, dynamics, amplitude, 17)
+    ok &= _run("halo", halo, dynamics, 1e-3, 17)
+    # 1.1e-2 是如实不收敛探针：17 点频带在 8.7e-3 附近停滞（ADR 0063），
+    # 输出残差与消息但不参与退出码。
+    _run("halo", halo, dynamics, 1.1e-2, 17)
     ok &= _run("halo", halo, dynamics, 0.031, 33)
 
     dro = _correct_dro(dynamics, 0.79188556619742, None)

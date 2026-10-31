@@ -191,6 +191,7 @@ class TestFailurePaths:
         assert result.message
         assert result.multiplier_argument > 0.0
         assert abs(result.rotation_number - result.multiplier_argument) <= 1e-4
+        assert result.newton_iterations > 1
 
     def test_invalid_amplitude_raises(self, halo_seed) -> None:
         """非正振幅属确定性输入错误，抛错而非软失败。"""
