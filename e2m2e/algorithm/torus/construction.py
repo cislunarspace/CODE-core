@@ -595,10 +595,11 @@ def construct_invariant_torus(
             密度须随振幅放大：环面截面的高次谐波随振幅增长，带宽不足
             时残差停在截断地板。L2 Halo 标定：振幅到 1e-2 量级用 17 点，
             到 0.031 用 33 点。
-        dynamics: 地月 CR3BP 动力学；缺省用标准地月系统。积分容差取
+        dynamics: 地月 CR3BP 动力学，缺省用标准地月系统。积分容差取
             dynamics 自带 rtol/atol，默认残差容差 1e-9 已贴研究级积分的
             噪声地板，收紧前先收紧积分容差。
-        tolerance: 收敛容差：不变性残差无穷范数上限。
+        tolerance: 收敛容差：全部残差行（不变性、钉扎与规范）的无穷范数
+            上限。
         max_iterations: 牛顿迭代上限。
 
     Returns:

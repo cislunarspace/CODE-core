@@ -177,6 +177,21 @@ class TestFailurePaths:
         assert result.cause.value == "invalid_input"
         assert "测试注入" in result.message
 
+    def test_two_center_seed_holds_rotation_number(self, dro_seed) -> None:
+        """双中心对种子：丢弃未规范方向后旋转数不漂移，失败如实报告。
+
+        面内振幅方向是方程组的精确零空间，不丢弃时步长沿该方向爆掉，
+        旋转数从法向对辐角漂走约 0.02 rad（ADR 0063 决策 5、8）。本用例
+        覆盖丢弃分支的可观察行为：构造仍不收敛（振幅塌缩，第二阶段限
+        制），但旋转数钉在中心对辐角附近。
+        """
+        orbit, dynamics = dro_seed
+        result = construct_invariant_torus(orbit, 1e-4, n_points=17, dynamics=dynamics)
+        assert result.status.value != "converged"
+        assert result.message
+        assert result.multiplier_argument > 0.0
+        assert abs(result.rotation_number - result.multiplier_argument) <= 1e-4
+
     def test_invalid_amplitude_raises(self, halo_seed) -> None:
         """非正振幅属确定性输入错误，抛错而非软失败。"""
         orbit, dynamics = halo_seed
