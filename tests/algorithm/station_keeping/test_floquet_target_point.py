@@ -335,6 +335,17 @@ class TestInjectedModalSource:
         with pytest.raises(FloquetModeError, match="对齐"):
             InjectedModalSource(orbit)
 
+    def test_basis_dual_shape_mismatch_rejected(self) -> None:
+        """两张模态表行数互不一致时确定性报错（同形校验）。"""
+        orbit = NominalOrbit(
+            epochs=np.linspace(0.0, 1.0, 11),
+            states=np.zeros((11, 6)),
+            floquet_basis=np.zeros((5, 6, 6)),
+            projection_factors=np.zeros((11, 6, 6)),
+        )
+        with pytest.raises(FloquetModeError, match="同形"):
+            InjectedModalSource(orbit)
+
 
 class TestSourceEquivalence:
     """注入表与在线数值投影两种来源的等价。"""

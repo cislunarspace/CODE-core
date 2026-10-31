@@ -191,10 +191,10 @@ class LooseTargetPointLaw:
 class SynodicNominalView(Protocol):
     """会合系标称轨道视图：任意时刻的标称状态（CR3BP 会合系无量纲，TU）。
 
-    与 ``NominalOrbitView`` 结构相同（仅 ``state_at``），但数值口径不同：
-    后者按星历链路约定为 GCRS km、km/s 与秒。Floquet 投影目标点律的
-    输入须用本口径，量纲状态与无量纲对偶行混算不会报错、只会得到无
-    意义的 Δv，因此单列协议以口径区分。
+    与 ``NominalOrbitView`` 结构相同（仅 ``state_at``），口径只体现在
+    题名与文档：结构化类型检查分辨不了数值口径，两协议互相可赋值，
+    GCRS km 视图传入本律不会报错、只会得到无意义的 Δv。题名单列是
+    为了在签名与文档层面把口径说清，混用由调用方负责。
     """
 
     def state_at(self, t: float) -> npt.NDArray[np.floating]:
@@ -222,9 +222,9 @@ class InjectedModalSource:
     表与历元跨一个周期（``build_nominal_orbit`` 的产物形状），查表按
     相位回卷到圈内，相位以首历元为原点，表历元整体平移整数周期不改
     变查表结果。对偶基第 5 行（漂移对偶行）T 周期，回卷逐历元成立；
-    切向行（第 0 行）跨圈按整圈数乘每圈漂移增长系数修正（系数取模态
-    基漂移列的一周期增量范数，见 ``dual_basis`` 的周期语义），跨圈查
-    表与在线重算一致。
+    切向行（第 0 行）跨圈按整圈数乘带符号每圈增长系数修正（系数取漂
+    移列一周期增量在单位切向上的投影，见 ``dual_basis`` 的周期语义），
+    跨圈查表与在线重算一致。
 
     Attributes:
         orbit: 已注入 ``floquet_basis`` 与 ``projection_factors`` 的标称
