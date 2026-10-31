@@ -16,6 +16,7 @@ solver/）：①构造问题（选轨道族、定约束、选流形方向）②�
 - ``propagation.py``：轨道预报薄壳。
 - ``coordinate/``：坐标转换算法。
 - ``manifold/``：不变流形 + 庞加莱截面。
+- ``torus/``：二维不变环面构造与定义级诊断（频闪口径，#842）。
 - ``proximity/``：相对运动。
 - ``spatiography/``：地月空间分区（Laplace 半径、影响球族、共振梯、区域分类；ADR 0041）。
 - ``normal_form/``：正规化（可选依赖）。
