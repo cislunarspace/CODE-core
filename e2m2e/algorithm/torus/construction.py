@@ -29,13 +29,13 @@ from typing import TYPE_CHECKING
 import numpy as np
 import numpy.typing as npt
 
-from e2m2e.algorithm.family.resonant_branch import classify_multiplier_pairs, monodromy
 from e2m2e.data.types.orbit import Orbit
 from e2m2e.exceptions import E2M2EError
 from e2m2e.status import ConvergenceState, FailureCause, ResultStatus
 
 if TYPE_CHECKING:
     from e2m2e.algorithm.dynamics import CR3BP_Dynamics
+    from e2m2e.algorithm.family.resonant_branch import MultiplierPair
 
 __all__ = [
     "CenterMultiplier",
@@ -171,6 +171,24 @@ class _Problem:
     dynamics: CR3BP_Dynamics
 
 
+def _unit_complex_pairs(pairs: tuple[MultiplierPair, ...]) -> list[MultiplierPair]:
+    """筛出非平凡、单位模、复数的乘子对（中心对候选）。
+
+    中心对选取与未规范方向计数共用同一谓词，阈值改动只落一处。
+    """
+    candidates = []
+    for pair in pairs:
+        if pair.is_trivial:
+            continue
+        values = pair.eigenvalues
+        if min(abs(abs(value) - 1.0) for value in values) > _UNIT_MODULUS_TOL:
+            continue
+        if min(abs(value.imag) for value in values) <= _COMPLEX_IMAG_TOL:
+            continue
+        candidates.append(pair)
+    return candidates
+
+
 def central_multiplier_pair(matrix: np.ndarray, flow_direction: np.ndarray) -> CenterMultiplier:
     """从单值矩阵谱中选取环面生长方向的非平凡中心乘子对。
 
@@ -190,18 +208,11 @@ def central_multiplier_pair(matrix: np.ndarray, flow_direction: np.ndarray) -> C
         TorusError: 无非平凡单位模乘子对，或多个中心对且无平面分块结构
             可判别。
     """
+    from e2m2e.algorithm.family.resonant_branch import classify_multiplier_pairs
+
     flow = np.asarray(flow_direction, dtype=float)
     pairs = classify_multiplier_pairs(matrix, flow, flow)
-    candidates = []
-    for pair in pairs:
-        if pair.is_trivial:
-            continue
-        values = pair.eigenvalues
-        if min(abs(abs(value) - 1.0) for value in values) > _UNIT_MODULUS_TOL:
-            continue
-        if min(abs(value.imag) for value in values) <= _COMPLEX_IMAG_TOL:
-            continue
-        candidates.append(pair)
+    candidates = _unit_complex_pairs(pairs)
     if not candidates:
         raise TorusError("无非平凡单位模乘子对：种子轨道在环面生长方向双曲或近简并")
     if len(candidates) > 1:
@@ -339,12 +350,7 @@ def _residual(problem: _Problem, q: np.ndarray) -> np.ndarray:
     return np.concatenate([invariance, [pin, gauge, slice_gauge]])
 
 
-def _jacobian(
-    problem: _Problem,
-    q: np.ndarray,
-    images: np.ndarray,
-    stms: np.ndarray,
-) -> np.ndarray:
+def _jacobian(problem: _Problem, q: np.ndarray, stms: np.ndarray) -> np.ndarray:
     """牛顿系统雅可比：解析组装（传播 STM、带限插值）。"""
     n = problem.n
     m = problem.m
@@ -453,7 +459,7 @@ def _newton(problem: _Problem, q0: np.ndarray, max_iterations: int) -> _Outcome:
                 history,
             )
         assert stms is not None
-        jac = _jacobian(problem, q, images, stms)
+        jac = _jacobian(problem, q, stms)
         left, singular, right_t = np.linalg.svd(jac, full_matrices=False)
         # 丢弃最小的 free_directions 个奇异方向：双中心对种子的面内振幅
         # 方向是精确零空间（数值 σ 极小但非零），按 σ/σ² 放大会把步长
@@ -617,6 +623,8 @@ def construct_invariant_torus(
 
     state0 = np.asarray(orbit.states[0], dtype=float).copy()
     seed_period = float(orbit.period)
+    from e2m2e.algorithm.family.resonant_branch import monodromy
+
     matrix = monodromy(dynamics, state0, seed_period)
     flow = np.asarray(dynamics.equations_of_motion(0.0, state0), dtype=float)
     phi = np.arange(n_points) * (2.0 * np.pi / n_points)
@@ -648,19 +656,15 @@ def construct_invariant_torus(
             newton_iterations=0,
             residual_history=[],
         )
-
     _, projection, gauge = _initial_curve(state0, center, amplitude, n_points)
     position_projection = projection[:3, :]
     # 未规范方向数：每个非平凡单位模对贡献一个环面族振幅参数，钉扎只固定
     # 所选对（平面种子的法向）的振幅，其余对（面内）的振幅方向是方程组的
-    # 精确零空间，高斯牛顿求解显式丢弃（见 _newton）。
-    unit_pairs = sum(
-        1
-        for pair in classify_multiplier_pairs(matrix, flow, flow)
-        if not pair.is_trivial
-        and min(abs(abs(value) - 1.0) for value in pair.eigenvalues) <= _UNIT_MODULUS_TOL
-        and min(abs(value.imag) for value in pair.eigenvalues) > _COMPLEX_IMAG_TOL
-    )
+    # 精确零空间，高斯牛顿求解显式丢弃（见 _newton）。与中心对选取共用
+    # 同一筛选谓词。
+    from e2m2e.algorithm.family.resonant_branch import classify_multiplier_pairs
+
+    unit_pairs = len(_unit_complex_pairs(classify_multiplier_pairs(matrix, flow, flow)))
     free_directions = max(0, unit_pairs - 1)
 
     def fine_amplitude(curve: np.ndarray) -> tuple[float, float]:

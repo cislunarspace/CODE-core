@@ -155,6 +155,28 @@ class TestFailurePaths:
         assert result.status.value != "converged"
         assert result.message
 
+    def test_unusable_spectrum_reports_status_triple(
+        self, halo_seed, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """中心对不可判时构造入口以状态三元组拒绝，不抛异常。
+
+        判别函数本身由合成谱测试直测；这里替换它触发构造入口的软失败
+        分支，验证状态三元组管线。
+        """
+        import e2m2e.algorithm.torus.construction as construction
+
+        def _reject(matrix, flow_direction):
+            raise TorusError("无非平凡单位模乘子对：测试注入")
+
+        monkeypatch.setattr(construction, "central_multiplier_pair", _reject)
+        orbit, dynamics = halo_seed
+        result = construction.construct_invariant_torus(
+            orbit, _TEST_AMPLITUDE, n_points=17, dynamics=dynamics
+        )
+        assert result.status.value == "failed"
+        assert result.cause.value == "invalid_input"
+        assert "测试注入" in result.message
+
     def test_invalid_amplitude_raises(self, halo_seed) -> None:
         """非正振幅属确定性输入错误，抛错而非软失败。"""
         orbit, dynamics = halo_seed
