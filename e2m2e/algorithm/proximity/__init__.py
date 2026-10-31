@@ -15,7 +15,11 @@ from .floquet_modes import (
     FloquetModeSet,
     FloquetPair,
     FloquetPairKind,
+    build_nominal_orbit,
+    dual_basis,
     floquet_modes,
+    invert_modal_basis,
+    modal_basis_at,
 )
 from .phasing import PhasingManeuver, PhasingSolution, phasing_search
 from .relative_dynamics import RelativeDynamics, RelativeState, TargetOrbit
@@ -41,7 +45,11 @@ __all__ = [
     "SafetyRegion",
     "SafetyReport",
     "check_passive_safety",
+    "build_nominal_orbit",
+    "dual_basis",
     "floquet_modes",
     "max_collision_probability",
+    "invert_modal_basis",
+    "modal_basis_at",
     "phasing_search",
 ]

@@ -20,6 +20,18 @@ e2m2e 不把 Floquet 基（`floquet_basis`）、投影因子（`projection_facto
 - 相关边界：不变环面（QPIT）构造（#690）**不得**以“对齐 #629”为名义重新引入本预计算契约——环面表示与拟周期星历语义是独立的数据面；
 - 验证纪律：ADR 0013 要求按物理定义验收；`.out-of-scope/qiao-normal-form-regression.md` 禁止以 qiao 中间结果作 oracle。
 
+## 复核结论（#843，2026-10-31）
+
+容器侧裁定维持：`NominalOrbit` 保持注入式，设计链路不自动填充，字段默认
+空。算法层落地投影因子生产路径：proximity 的对偶基表与注入构造
+（`dual_basis`、`build_nominal_orbit`），站保侧 Floquet 投影目标点律使用。
+本文前文的“无生产者的可选扩展点”“包内无生产者”自 #843 起被取代为
+“容器不自动填充，算法层已有显式生产路径”，此取代只覆盖 Floquet 模态
+基表与对偶基表两个字段，插值器仍未实现。“投影因子的定义依赖具体
+控制律”收窄为“依赖控制律的是调用方的取行与组合，对偶基表本身控制律
+无关”，其余裁定不变。单位制与对偶基语义见 `CONTEXT.md` 的投影因子与
+对偶基表词条及 `NominalOrbit` 字段 docstring。
+
 ## 过往请求
 
 - [#629](https://github.com/cislunarspace/CODE-core/issues/629)：NominalOrbit 落地 Floquet 基与投影因子、兑现站保契约声称 —— 维护者裁定不立项，以 `Not planned` 关闭

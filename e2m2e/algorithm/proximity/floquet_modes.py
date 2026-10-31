@@ -48,6 +48,12 @@ docstring，不进断言（ADR 0055）：2:1 地月 DRO 取月心近侧穿越 �
 文另给出有界条件 ẋ(0) ≈ −2.04 x(0)；本模块在该成员上给出的充要约束化
 为 δvy = −0.73 δx（δvx 不受约束），与论文数值不属同一初值参数化，
 未作对齐。
+
+投影生产路径（#843）：``dual_basis`` 逐历元取模态基之逆，给出把偏差
+分解到模态坐标（投影因子）所需的算子表，控制律无关。``modal_basis_at``
+在任意时刻在线重构模态基。``build_nominal_orbit`` 把基表与对偶基表按
+CR3BP 会合系无量纲口径注入 ``NominalOrbit`` 的可选注入点，并做相位
+原点一致性校验。容器保持注入式：设计链路不自动填充，字段默认空。
 """
 
 from __future__ import annotations
@@ -58,6 +64,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from ...data.types.trajectory import NominalOrbit
 from ...exceptions import E2M2EError
 
 if TYPE_CHECKING:
@@ -77,6 +84,9 @@ _UNIT_MODULUS_TOL = 1e-3
 
 #: 复对旋转恒等 M a = cosα·a − sinα·b 的校验门限。
 _ROTATION_TOL = 1e-6
+
+#: 对偶基乘积残差门限（后向误差判据，非条件数判据）。
+_DUAL_PRODUCT_TOL = 1e-6
 
 #: 面内块（x、y、vx、vy）与法向块（z、vz）的跨块耦合门限。平面轨道的
 #: 两块精确解耦（实测跨块元素为零），三维轨道在 1e2 量级。
@@ -198,16 +208,7 @@ def floquet_modes(
     eigenvalues, _ = np.linalg.eig(monodromy)
     in_plane, out_of_plane = _classify_pairs(eigenvalues, monodromy)
 
-    basis = np.empty((grid.shape[0], 6, 6))
-    basis[:, :, 0] = stm @ tangent
-    basis[:, :, 5] = stm @ drift
-    for pair, col_u, col_v in ((in_plane, 1, 2), (out_of_plane, 3, 4)):
-        theta = pair.alpha * (grid - t_origin) / period
-        cos, sin = np.cos(theta), np.sin(theta)
-        phi_a = stm @ pair.a
-        phi_b = stm @ pair.b
-        basis[:, :, col_u] = cos[:, None] * phi_a + sin[:, None] * phi_b
-        basis[:, :, col_v] = -sin[:, None] * phi_a + cos[:, None] * phi_b
+    basis = _basis_from_stm(stm, grid - t_origin, tangent, drift, in_plane, out_of_plane, period)
 
     # 有界子空间法向量：模态初值矩阵（basis[0]，Φ(t₀)=I）的漂移对偶行，
     # 满足 n·ê_k(t₀) = 0（k 取前五列）且 n·v2 = 1。
@@ -226,6 +227,176 @@ def floquet_modes(
         times=grid,
         basis=basis,
         bounded_normal=bounded_normal,
+    )
+
+
+def _basis_from_stm(
+    stm: np.ndarray,
+    elapsed: np.ndarray,
+    tangent: np.ndarray,
+    drift: np.ndarray,
+    in_plane: FloquetPair,
+    out_of_plane: FloquetPair,
+    period: float,
+) -> np.ndarray:
+    """由状态转移矩阵与模态初值按定义式重构模态基采样，列序同 ``basis``。
+
+    ``elapsed`` 为相对相位原点的时长数组：切向与漂移列取 STM 作用，
+    两对中心列按周期化组合。网格采样与任意时刻在线重算共用本路径。
+    """
+    basis = np.empty((elapsed.shape[0], 6, 6))
+    basis[:, :, 0] = stm @ tangent
+    basis[:, :, 5] = stm @ drift
+    for pair, col_u, col_v in ((in_plane, 1, 2), (out_of_plane, 3, 4)):
+        theta = pair.alpha * elapsed / period
+        cos, sin = np.cos(theta), np.sin(theta)
+        phi_a = stm @ pair.a
+        phi_b = stm @ pair.b
+        basis[:, :, col_u] = cos[:, None] * phi_a + sin[:, None] * phi_b
+        basis[:, :, col_v] = -sin[:, None] * phi_a + cos[:, None] * phi_b
+    return basis
+
+
+def invert_modal_basis(basis: npt.ArrayLike) -> np.ndarray:
+    """模态基逐历元求逆并做乘积校验（对偶基表与在线来源共用的守卫）。
+
+    奇异矩阵的 ``LinAlgError`` 与乘积残差超过 ``_DUAL_PRODUCT_TOL`` 或
+    含非有限值的情形一律转成 :class:`FloquetModeError`，不向调用方泄漏
+    numpy 异常或病态结果。
+
+    Args:
+        basis: 模态基采样，形状 ``(..., 6, 6)``。
+
+    Returns:
+        同形状的对偶基。
+
+    Raises:
+        FloquetModeError: 模态基奇异，或乘积校验失败。
+    """
+    matrix = np.asarray(basis, dtype=float)
+    try:
+        dual = np.linalg.inv(matrix)
+    except np.linalg.LinAlgError as exc:
+        raise FloquetModeError(f"模态基奇异，无法构造对偶基：{exc}") from exc
+    residual = float(np.max(np.abs(np.matmul(dual, matrix) - np.eye(6))))
+    if not np.isfinite(residual) or residual > _DUAL_PRODUCT_TOL:
+        detail = "含非有限值" if not np.isfinite(residual) else f"最大残差 {residual:.2e}"
+        raise FloquetModeError(f"对偶基乘积校验失败（{detail}），模态基奇异或病态")
+    return dual
+
+
+def dual_basis(modes: FloquetModeSet) -> np.ndarray:
+    """对偶基表：模态基 B(t) 逐历元之逆（#843 投影生产路径）。
+
+    偏差状态分解到模态坐标（投影因子）的算子表：第 i 行与偏差的点积
+    给出第 i 个模态坐标 αᵢ(t) = [B(t)⁻¹]ᵢ·δx(t)，行序同 ``basis`` 列序
+    [切向, 面内 u, 面内 v, 法向 u, 法向 v, 漂移]。定义控制律无关
+    （Gómez vol I §8.2.3 投影控制方法学的机械分解层），依赖控制律的
+    取行与组合属调用方。单位制同模态集：CR3BP 会合系无量纲。
+
+    周期语义：模态基仅切向前的五列 T 周期，漂移列每周期增长一个切向
+    量，因此对偶基的第 5 行（漂移对偶行，即有界子空间法向量的逐历元
+    取值）T 周期，可按模 T 延拓查表。切向行（第 0 行）跨周期按整圈数
+    修正，每满一圈减去漂移对偶行（第 5 行），其余行不变。
+
+    Args:
+        modes: 模态基础解集（``basis`` 已在整周期网格上采样）。
+
+    Returns:
+        形状 ``(n, 6, 6)`` 的对偶基表。
+
+    Raises:
+        FloquetModeError: 模态基在某个历元奇异，或乘积校验失败。
+    """
+    return invert_modal_basis(modes.basis)
+
+
+def modal_basis_at(modes: FloquetModeSet, t: float, dynamics: CR3BP_Dynamics) -> np.ndarray:
+    """任意时刻的模态基 B(t)（在线重算路径）。
+
+    从相位原点传播 STM 到 ``t`` 后按定义式重构六列。逐次调用一次传播，
+    生产控制序列应查注入表，本路径用于等价验证与稀疏查询。``t`` 须不
+    早于相位原点（STM 正向传播）。单位制同模态集：CR3BP 会合系无量纲。
+
+    Args:
+        modes: 模态基础解集。
+        t: 求值时刻（TU，``t ≥ t_origin``）。
+        dynamics: 构造该模态集的 CR3BP 动力学。
+
+    Returns:
+        形状 ``(6, 6)`` 的模态基，列序同 ``basis``。
+    """
+    t = float(t)
+    elapsed = t - modes.t_origin
+    if abs(elapsed) < 1e-12:
+        return np.asarray(modes.basis[0], dtype=float).copy()
+    if elapsed < 0.0:
+        raise FloquetModeError("在线重构只支持不早于相位原点的时刻")
+    result = dynamics.propagate(modes.state0, (modes.t_origin, t), t_eval=[t], with_stm=True)
+    stm = np.asarray(result["stm"], dtype=float)
+    return _basis_from_stm(
+        stm,
+        np.array([elapsed]),
+        modes.tangent,
+        modes.drift,
+        modes.in_plane,
+        modes.out_of_plane,
+        modes.period,
+    )[0]
+
+
+def build_nominal_orbit(
+    modes: FloquetModeSet,
+    states: npt.ArrayLike,
+    *,
+    epochs: npt.ArrayLike | None = None,
+) -> NominalOrbit:
+    """由模态基础解集构造注入式的标称轨道容器（#843 最小注入路径）。
+
+    状态表 ``states`` 须为模态采样网格上的状态采样（形状 ``(n, 6)``）。
+    ``epochs`` 缺省取网格本身，给定时须为网格的整数周期平移（按模 T
+    对齐的相位原点一致性校验，违反时确定性报错）。注入字段单位制为
+    CR3BP 会合系无量纲，``epochs`` 在本口径为 TU。容器 docstring 的
+    UTC 口径属设计链路（FR1 星历）约定，两条注入路径互不改变。
+
+    Args:
+        modes: 模态基础解集。
+        states: 模态网格上的状态表，形状 ``(n, 6)``。
+        epochs: 状态表历元，缺省取 ``modes.times``。
+
+    Returns:
+        ``floquet_basis`` 与 ``projection_factors``（对偶基表）已注入、
+        其余可选字段保持空的 :class:`NominalOrbit`。
+
+    Raises:
+        FloquetModeError: 状态表形状不符、模态网格非等间距或历元非有限，
+            或历元不满足相位原点一致性。
+    """
+    grid = np.asarray(modes.times, dtype=float)
+    if grid.ndim != 1 or grid.shape[0] < 2 or not np.all(np.isfinite(grid)):
+        raise FloquetModeError("模态采样网格须为一维、至少两点且全部有限")
+    table = np.asarray(states, dtype=float)
+    if table.ndim != 2 or table.shape != (grid.shape[0], 6):
+        raise FloquetModeError(f"状态表形状须为 {(grid.shape[0], 6)}，当前为 {table.shape}")
+    steps = np.diff(grid)
+    if not np.allclose(steps, steps[0], rtol=0.0, atol=1e-9):
+        raise FloquetModeError("模态采样网格须等间距（标称轨道容器只收等间距历元表）")
+    if epochs is None:
+        epochs_out = grid.copy()
+    else:
+        epochs_out = np.asarray(epochs, dtype=float)
+        if epochs_out.shape != grid.shape:
+            raise FloquetModeError("历元数组长度须与模态采样网格一致")
+        if not np.all(np.isfinite(epochs_out)):
+            raise FloquetModeError("历元数组须全部为有限值")
+        shift = int(round((epochs_out[0] - grid[0]) / modes.period))
+        if not np.allclose(epochs_out, grid + shift * modes.period, rtol=0.0, atol=1e-9):
+            raise FloquetModeError("相位原点一致性校验失败：历元须为模态采样网格的整数周期平移")
+    return NominalOrbit(
+        epochs=epochs_out,
+        states=table,
+        floquet_basis=np.asarray(modes.basis, dtype=float).copy(),
+        projection_factors=dual_basis(modes),
     )
 
 
@@ -371,5 +542,9 @@ __all__ = [
     "FloquetModeSet",
     "FloquetPair",
     "FloquetPairKind",
+    "build_nominal_orbit",
+    "dual_basis",
     "floquet_modes",
+    "invert_modal_basis",
+    "modal_basis_at",
 ]
