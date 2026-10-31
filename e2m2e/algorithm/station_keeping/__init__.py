@@ -34,6 +34,7 @@ from .target_point import (
     NominalOrbitView,
     OnlineModalSource,
     StrictTargetPointLaw,
+    SynodicNominalView,
 )
 
 __all__ = [
@@ -46,6 +47,7 @@ __all__ = [
     "LooseTargetPointLaw",
     "StrictTargetPointLaw",
     "NominalOrbitView",
+    "SynodicNominalView",
     "FloquetModalSource",
     "FloquetTargetPointLaw",
     "InjectedModalSource",

@@ -23,6 +23,7 @@ Floquet 投影变体（#843，Gómez vol I §8.2.3 方法学）例外：它在 C
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
@@ -43,6 +44,7 @@ if TYPE_CHECKING:
     from ..dynamics import CR3BP_Dynamics
 
 __all__ = [
+    "SynodicNominalView",
     "NominalOrbitView",
     "StrictTargetPointLaw",
     "LooseTargetPointLaw",
@@ -186,11 +188,26 @@ class LooseTargetPointLaw:
         return -np.linalg.solve(lhs, rhs)
 
 
+class SynodicNominalView(Protocol):
+    """会合系标称轨道视图：任意时刻的标称状态（CR3BP 会合系无量纲，TU）。
+
+    与 ``NominalOrbitView`` 结构相同（仅 ``state_at``），但数值口径不同：
+    后者按星历链路约定为 GCRS km、km/s 与秒。Floquet 投影目标点律的
+    输入须用本口径，量纲状态与无量纲对偶行混算不会报错、只会得到无
+    意义的 Δv，因此单列协议以口径区分。
+    """
+
+    def state_at(self, t: float) -> npt.NDArray[np.floating]:
+        """t（TU）时刻的标称状态（6 维，会合系无量纲）。"""
+        ...
+
+
 class FloquetModalSource(Protocol):
     """模态量来源：任意时刻的模态对偶基（6×6，行序同模态基列序）。
 
     两种实现：``InjectedModalSource`` 查注入 ``NominalOrbit`` 的对偶基
     表（生产路径），``OnlineModalSource`` 按需传播重算（等价验证）。
+    两者在任意时刻（含跨整圈）都给出 B(t)⁻¹，跨圈语义一致。
     """
 
     def dual_basis_at(self, t: float) -> npt.NDArray[np.floating]:
@@ -200,20 +217,22 @@ class FloquetModalSource(Protocol):
 
 @dataclass
 class InjectedModalSource:
-    """注入表来源：``NominalOrbit.projection_factors`` 对偶基表的模 T 查表。
+    """注入表来源：``NominalOrbit`` 模态表的模 T 查表。
 
     表与历元跨一个周期（``build_nominal_orbit`` 的产物形状），查表按
     相位回卷到圈内，相位以首历元为原点，表历元整体平移整数周期不改
-    变查表结果。对偶基第 5 行（漂移对偶行）T 周期，回卷查表对它逐历
-    元成立。切向行（第 0 行）跨圈不修正，需要跨圈切向坐标的调用方按
-    整圈数自行修正（见 ``dual_basis`` 的周期语义说明）。
+    变查表结果。对偶基第 5 行（漂移对偶行）T 周期，回卷逐历元成立；
+    切向行（第 0 行）跨圈按整圈数乘每圈漂移增长系数修正（系数取模态
+    基漂移列的一周期增量范数，见 ``dual_basis`` 的周期语义），跨圈查
+    表与在线重算一致。
 
     Attributes:
-        orbit: 已注入 ``projection_factors`` 的标称轨道容器。
+        orbit: 已注入 ``floquet_basis`` 与 ``projection_factors`` 的标称
+            轨道容器（后者载对偶基表）。
 
     Raises:
-        FloquetModeError: 字段未注入、形状不符、历元少于两个或非严格
-            递增。
+        FloquetModeError: 字段未注入、形状不符、历元少于两个、含非有
+            限值或非严格递增。
     """
 
     orbit: NominalOrbit
@@ -224,30 +243,47 @@ class InjectedModalSource:
         if dual is None:
             raise FloquetModeError("projection_factors 未注入，无法按注入表取模态量")
         dual = np.asarray(dual, dtype=float)
+        basis = self.orbit.floquet_basis
+        if basis is None:
+            raise FloquetModeError("floquet_basis 未注入，跨圈切向行修正需要模态基表")
+        basis = np.asarray(basis, dtype=float)
         if dual.ndim != 3 or dual.shape[1:] != (6, 6):
             raise FloquetModeError("projection_factors 须为逐历元 (n, 6, 6) 对偶基表")
+        if basis.shape != dual.shape:
+            raise FloquetModeError("floquet_basis 须与 projection_factors 逐历元同形")
         if epochs.ndim != 1 or epochs.shape[0] != dual.shape[0]:
             raise FloquetModeError("epochs 须为一维且与对偶基表逐历元对齐（跨一个周期）")
         if epochs.shape[0] < 2:
             raise FloquetModeError("epochs 至少两个历元（单点表无回卷跨度）")
-        if not np.all(np.isfinite(epochs)) or not np.all(np.isfinite(dual)):
-            raise FloquetModeError("epochs 与对偶基表须全部为有限值")
+        if not (
+            np.all(np.isfinite(epochs)) and np.all(np.isfinite(dual)) and np.all(np.isfinite(basis))
+        ):
+            raise FloquetModeError("epochs 与两张模态表须全部为有限值")
         if np.any(np.diff(epochs) <= 0.0):
             raise FloquetModeError("epochs 须严格递增")
         self._origin = float(epochs[0])
         self._phases = epochs - epochs[0]
         self._dual = dual
+        # 漂移列一周期沿单位切向的带符号增量（漂移方向归一化的取向
+        # 决定符号），即切向行的每圈修正系数。
+        growth = basis[-1][:, 5] - basis[0][:, 5]
+        self._lap_shift = float(growth @ basis[0][:, 0])
 
     def dual_basis_at(self, t: float) -> npt.NDArray[np.floating]:
-        """相位回卷后以相对相位逐分量线性插值查表。"""
+        """相位回卷插值查表，切向行按整圈数修正。"""
         span = float(self._phases[-1])
-        phase = (float(t) - self._origin) % span
-        return np.array(
+        elapsed = float(t) - self._origin
+        phase = elapsed % span
+        laps = math.floor(elapsed / span)
+        dual_at = np.array(
             [
                 [np.interp(phase, self._phases, self._dual[:, i, j]) for j in range(6)]
                 for i in range(6)
             ]
         )
+        if laps:
+            dual_at[0] = dual_at[0] - laps * self._lap_shift * dual_at[5]
+        return dual_at
 
 
 @dataclass
@@ -282,11 +318,9 @@ class FloquetTargetPointLaw:
 
     面内与法向中心分量有界振荡、切向分量是相位偏移，均不修正。模态量
     经 ``modal`` 来源显式注入（注入表或在线数值投影），不靠属性嗅探。
-    口径要求：``nominal`` 与 ``modal`` 须同为 CR3BP 会合系无量纲、时间
-    同基准（TU）。``NominalOrbitView`` 协议的 GCRS km/km/s 口径属星历
-    链路的既有视图，本律结构上兼容该协议，但数值口径不匹配时结果无意
-    义且不报错，调用方负责同口径注入。Gómez 方法学的开/关判据与死区
-    属调用方在此解析解之上组合。
+    ``nominal`` 与 ``modal`` 须同为 CR3BP 会合系无量纲、时间同基准
+    （TU），标称视图用 :class:`SynodicNominalView` 口径。Gómez 方法学
+    的开/关判据与死区属调用方在此解析解之上组合。
     """
 
     def compute_maneuver(
@@ -294,7 +328,7 @@ class FloquetTargetPointLaw:
         state0: npt.ArrayLike,
         t0: float,
         *,
-        nominal: NominalOrbitView,
+        nominal: SynodicNominalView,
         modal: FloquetModalSource,
     ) -> npt.NDArray[np.floating]:
         """计算控制量 Δv（与输入状态同单位制）。
@@ -302,7 +336,7 @@ class FloquetTargetPointLaw:
         Args:
             state0: 控制时刻测量状态（与标称视图同口径）。
             t0: 控制时刻（与标称视图、模态量来源同时间基准）。
-            nominal: 标称轨道视图（任意时刻标称状态，须与模态量同口径）。
+            nominal: 标称轨道视图（任意时刻标称状态，会合系无量纲口径）。
             modal: 模态量来源（任意时刻模态对偶基）。
 
         Returns:

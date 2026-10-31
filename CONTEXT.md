@@ -48,7 +48,8 @@ _避免_：契约、contract
 
 ### 接口（Interface）
 两个部分相接、可独立变化的边界。
-_避免_：缝、seam、契约（仓库行文不再用“契约”指接口或数据交接边界）
+_避免_：缝、seam、契约（现行行文以接口、数据容器指称数据交接边界，历史
+记录中的用词不改写）
 
 ### 调用链（Call chain）
 调用方调起本仓库的路径：进程内 import、MCP、CLI、stdio sidecar 协议。
@@ -303,8 +304,8 @@ _避免_：LVLH 原点（参考体不是坐标原点）、惯性 LVLH（未实�
 [切向, 面内 u, 面内 v, 法向 u, 法向 v, 漂移]（#832）。
 面内与法向的归属按单值矩阵的分块结构确定，当前只支持平面周期轨道，
 三维轨道按跨块耦合确定性报错。
-_避免_：Floquet 基（曾作为 NominalOrbit 契约字段名随 #629 拒绝；算法层
-构造与契约字段是两件事，见 `.out-of-scope/nominal-orbit-floquet-precompute.md`）
+_避免_：Floquet 基（曾作为 NominalOrbit 字段的语义声称随 #629 拒绝；算法层
+构造与容器字段是两件事，见 `.out-of-scope/nominal-orbit-floquet-precompute.md`）
 
 ### 周期化（Periodicization）
 把单位模共轭复对的特征向量组合成 T 周期模态函数的构造：

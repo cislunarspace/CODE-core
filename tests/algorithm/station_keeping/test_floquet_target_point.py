@@ -255,20 +255,38 @@ class TestInjectedModalSource:
                 online.dual_basis_at(modes.times[k])[1:], got[1:], rtol=1e-8, atol=1e-8
             )
 
-    def test_tangent_row_wrap_is_uncorrected(self, dro21, modes21) -> None:
-        """回卷查表返回未修正的圈内第 0 行（跨圈修正属调用方）。"""
+    def test_tangent_row_corrected_across_laps(self, dro21, modes21) -> None:
+        """跨圈查表对切向行按整圈数乘每圈增长系数修正，与在线真值一致。"""
         epochs, states = _nominal_table(dro21, modes21)
         source = InjectedModalSource(build_nominal_orbit(modes21, states))
+        in_cycle = source.dual_basis_at(epochs[60])
         wrapped = source.dual_basis_at(epochs[60] + 2.0 * modes21.period)
-        np.testing.assert_allclose(
-            wrapped[0], source.dual_basis_at(epochs[60])[0], rtol=0.0, atol=1e-12
+        lap_shift = float(
+            (modes21.basis[-1][:, 5] - modes21.basis[0][:, 5]) @ modes21.basis[0][:, 0]
         )
+        np.testing.assert_allclose(
+            wrapped[0], in_cycle[0] - 2.0 * lap_shift * in_cycle[5], rtol=0.0, atol=1e-9
+        )
+        online = OnlineModalSource(modes21, dro21[1])
+        truth = online.dual_basis_at(epochs[60] + 2.0 * modes21.period)
+        np.testing.assert_allclose(wrapped[0], truth[0], rtol=1e-8, atol=1e-8)
+
+    def test_missing_floquet_basis_rejected(self) -> None:
+        """floquet_basis 未注入的容器无法做跨圈切向修正，确定性报错。"""
+        orbit = NominalOrbit(
+            epochs=np.linspace(0.0, 1.0, 11),
+            states=np.zeros((11, 6)),
+            projection_factors=np.zeros((11, 6, 6)),
+        )
+        with pytest.raises(FloquetModeError, match="floquet_basis"):
+            InjectedModalSource(orbit)
 
     def test_single_epoch_table_rejected(self) -> None:
         """单历元表跨距为零，无法回卷查表，确定性报错。"""
         orbit = NominalOrbit(
             epochs=np.zeros(1),
             states=np.zeros((1, 6)),
+            floquet_basis=np.zeros((1, 6, 6)),
             projection_factors=np.zeros((1, 6, 6)),
         )
         with pytest.raises(FloquetModeError, match="至少"):
@@ -279,7 +297,10 @@ class TestInjectedModalSource:
         epochs = np.linspace(0.0, 1.0, 11)
         epochs[4] = np.nan
         orbit = NominalOrbit(
-            epochs=epochs, states=np.zeros((11, 6)), projection_factors=np.zeros((11, 6, 6))
+            epochs=epochs,
+            states=np.zeros((11, 6)),
+            floquet_basis=np.zeros((11, 6, 6)),
+            projection_factors=np.zeros((11, 6, 6)),
         )
         with pytest.raises(FloquetModeError, match="有限"):
             InjectedModalSource(orbit)
@@ -289,7 +310,10 @@ class TestInjectedModalSource:
         epochs = np.linspace(0.0, 1.0, 11)
         epochs[4] = epochs[3]
         orbit = NominalOrbit(
-            epochs=epochs, states=np.zeros((11, 6)), projection_factors=np.zeros((11, 6, 6))
+            epochs=epochs,
+            states=np.zeros((11, 6)),
+            floquet_basis=np.zeros((11, 6, 6)),
+            projection_factors=np.zeros((11, 6, 6)),
         )
         with pytest.raises(FloquetModeError, match="严格递增"):
             InjectedModalSource(orbit)
@@ -305,6 +329,7 @@ class TestInjectedModalSource:
         orbit = NominalOrbit(
             epochs=np.linspace(0.0, 1.0, 11),
             states=np.zeros((11, 6)),
+            floquet_basis=np.zeros((5, 6, 6)),
             projection_factors=np.zeros((5, 6, 6)),
         )
         with pytest.raises(FloquetModeError, match="对齐"):
