@@ -77,3 +77,17 @@ rationale and the rejected path are recorded in
 `.out-of-scope/nominal-orbit-floquet-precompute.md`; the empty
 `e2m2e/algorithm/nominal_orbit/` placeholder module and its empty test
 directory were removed as dead weight.
+
+## Revision (2026-10-31, issue #843)
+
+The 2026-09-26 revision's "no producer in this repository" clause lapses for
+two of the three fields: `dual_basis` (dual-basis table, the per-epoch inverse
+of the modal basis) and `build_nominal_orbit` in `algorithm/proximity` are
+explicit producers, and `station_keeping` gains a Floquet-projection target
+point law that consumes them. The container stays injection-style: design
+outputs never auto-fill these fields, `state_at` and the field shapes are
+unchanged, and the interpolator remains unimplemented. "Projection factors
+cannot be defined control-law-agnostically" narrows to the table itself being
+control-law-agnostic; which rows to take and how to combine them belongs to
+the caller. The re-review record lives in
+`.out-of-scope/nominal-orbit-floquet-precompute.md` (复核结论 section).

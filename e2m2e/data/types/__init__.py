@@ -5,8 +5,9 @@ State/Epoch 是类型别名（单值 → 别名）；Orbit/EphemerisTable/Nomina
 
 实现状态：已迁移（ADR 0011 第 1 批）。``Orbit``/``OrbitFamily`` 自
 ``core/orbit.py`` 迁入；``EphemerisTable`` 自 ``io/ephemeris.py`` 迁入；
-``NominalOrbit`` 为新类型（FR1↔FR2 契约；Floquet 基／投影因子／插值器为
-无生产者的可选扩展点，见 ``.out-of-scope/nominal-orbit-floquet-precompute.md``）。
+``NominalOrbit`` 为新类型（FR1↔FR2 交接数据容器）。Floquet 模态基表、
+对偶基表、插值器是可选注入点，前两者的算法层生产路径见 ``proximity``，
+插值器未实现，决策记录见 ``.out-of-scope/nominal-orbit-floquet-precompute.md``。
 文本格式序列化函数（parse/read/write）与容器同生命周期，也从此处导出。
 """
 

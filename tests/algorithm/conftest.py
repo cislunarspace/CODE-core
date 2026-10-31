@@ -112,3 +112,36 @@ def _make_earth_moon_system():
     from e2m2e.algorithm.dynamics import CR3BP_System
 
     return CR3BP_System(mu=Datum.DE421.mu, primary="earth", secondary="moon")
+
+
+# =============================================================================
+# 2:1 DRO 的 Floquet 模态场景（proximity 与 station_keeping 共用，#832/#843）
+# =============================================================================
+
+
+@pytest.fixture(scope="session")
+def dro21_raw() -> tuple[Orbit, CR3BP_Dynamics]:
+    """2:1 地月 DRO（月心近侧穿越 −0.192 LU）与地月动力学，只读缓存。"""
+    from e2m2e.algorithm.family.orbits.dro import _correct_dro
+    from e2m2e.algorithm.family.orbits.walk import earth_moon_system
+
+    dynamics = CR3BP_Dynamics(earth_moon_system())
+    seed = _correct_dro(dynamics, DRO_X0, None)
+    orbit = _correct_dro(dynamics, (1.0 - dynamics.system.mu) - 0.192, seed)
+    return orbit, dynamics
+
+
+@pytest.fixture
+def dro21(dro21_raw: tuple[Orbit, CR3BP_Dynamics]) -> tuple[Orbit, CR3BP_Dynamics]:
+    """2:1 地月 DRO 与地月动力学，函数级返回轨道副本。"""
+    orbit, dynamics = dro21_raw
+    return orbit.copy(), dynamics
+
+
+@pytest.fixture(scope="session")
+def modes21(dro21_raw: tuple[Orbit, CR3BP_Dynamics]):
+    """2:1 DRO 的 Floquet 模态，session 级只读缓存。"""
+    from e2m2e.algorithm.proximity import floquet_modes
+
+    orbit, dynamics = dro21_raw
+    return floquet_modes(orbit, dynamics)

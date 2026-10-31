@@ -1,11 +1,12 @@
-"""轨迹数据容器：EphemerisTable（通用星历容器）与 NominalOrbit（名义轨道契约）。
+"""轨迹数据容器：EphemerisTable（通用星历容器）与 NominalOrbit（名义轨道容器）。
 
 - ``EphemerisTable``：UTC + GCRS 位置 km/速度 m/s + 会合系位置，通用容器（ADR 0011
   迁移，源：``io/ephemeris.py``）。文本格式 parse/read/write 函数与本容器同生命周期，
   不作独立脚本。
-- ``NominalOrbit``：FR1↔FR2 数据契约（ADR 0015，Gómez vol I §8.2.3）：等间距历元
-  状态表 + Floquet 基 + 投影因子表 + 高次插值器。Floquet 基 + 投影因子由 FR1
-  预计算，控制全程插值不复算。
+- ``NominalOrbit``：FR1↔FR2 交接数据容器（ADR 0015）。容器只承诺等间距
+  历元状态表。``floquet_basis``、``projection_factors``、``interpolator``
+  三个字段是可选注入点，前两者的算法层生产路径见 ``proximity``（#843），
+  插值器未实现，设计链路不自动填充。
 """
 
 from __future__ import annotations
@@ -58,20 +59,26 @@ class EphemerisTable:
 
 @dataclass
 class NominalOrbit:
-    """名义轨道：FR1（设计）→ FR2（保持）数据契约。
+    """名义轨道：FR1（设计）向 FR2（保持）交接的数据容器。
 
-    契约只保证 ``epochs``/``states`` 等间距状态表；``floquet_basis``、
-    ``projection_factors``、``interpolator`` 是**无生产者的可选扩展点**，
-    需要它们的调用方在上游生成后注入（见
-    ``.out-of-scope/nominal-orbit-floquet-precompute.md``）。
+    容器只保证 ``epochs``/``states`` 等间距状态表。``floquet_basis``、
+    ``projection_factors``、``interpolator`` 是可选注入点，需要它们的
+    调用方生成后注入（算法层生产路径见 ``proximity``，#843，决策记录
+    见 ``.out-of-scope/nominal-orbit-floquet-precompute.md``）。
 
     Attributes:
-        epochs: 等间距历元（UTC）。
-        states: 等间距历元状态表（GCRS，km, km/s，形状 (n, 6)）。
+        epochs: 等间距历元（UTC）。Floquet 注入路径（#843）例外：历元
+            为 TU（CR3BP 特征时间），与注入字段同口径。
+        states: 等间距历元状态表（GCRS，km, km/s，形状 (n, 6)）。Floquet
+            注入路径例外：会合系无量纲状态，与注入字段同口径。
         synodic_positions: 会合系位置（可选，绘图/特征点用）。
-        floquet_basis: Floquet 基向量表（可选扩展点；本仓库无生产者）。
-        projection_factors: 投影因子表（可选扩展点；定义依赖具体控制律，本仓库不预计算）。
-        interpolator: 高次插值器（可选扩展点；Lagrange r=5~6，本仓库未实现）。
+        floquet_basis: 模态基向量表（可选注入点，Floquet 模态基础解集的
+            采样，CR3BP 会合系无量纲，历元与 epochs 按模周期对齐）。
+        projection_factors: 对偶基表（可选注入点，字段名沿历史，载逐历元
+            模态基之逆的分解算子而非投影因子坐标本身，CR3BP 会合系
+            无量纲）。
+        interpolator: 高次插值器（可选注入点，Lagrange r=5~6，本仓库
+            未实现）。
     """
 
     epochs: np.ndarray
@@ -85,7 +92,7 @@ class NominalOrbit:
         """任意时刻（秒）的标称状态（6 维），经插值器。"""
         if self.interpolator is None:
             raise NotImplementedError("NominalOrbit 插值器待实现")
-        raise NotImplementedError  # pragma: no cover - 插值器契约待 FR1 落地
+        raise NotImplementedError  # pragma: no cover - 插值器待 FR1 落地
 
 
 # ===========================================================================

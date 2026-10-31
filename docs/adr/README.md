@@ -37,7 +37,7 @@
 | 0012 | Dependency-direction rules with CI import checks | Adopted (implemented; dependency table and enforcement scope revised by ADR 0039) |
 | 0013 | Verification strategy: complete tasks by definition | Adopted (test-tiering clause superseded by ADR 0021) |
 | 0014 | Interface layer Facade/MCP/CLI | Adopted (implemented; decisions 2 and 5 revised by ADR 0043, decision 8 completed for catalog value sets by ADR 0044) |
-| 0015 | NominalOrbit contract and coordinate-conversion abstraction | Adopted (implemented) |
+| 0015 | NominalOrbit contract and coordinate-conversion abstraction | Adopted (decision 1 revised 2026-09-26 and 2026-10-31: fields stay injectable, producers in `proximity`) |
 | 0016 | EphemCache ephemeris cache architecture | Adopted |
 | 0017 | Transfer grid search: purely numerical kernel pushed down to Rayon | Adopted |
 | 0018 | Jacobian interface extended with ∂a/∂v; STM covers velocity dependence | Adopted |
