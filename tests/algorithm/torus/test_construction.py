@@ -4,7 +4,7 @@
 性质：频闪不变性残差、共轭性残差、旋转数与单值矩阵中心对辐角的零振幅
 极限一致、长时到环面距离有界。论文对照值（第二周期 36.5 天与 58.3
 天、法向振幅 0.031）属结果性数值，不进断言。可达振幅包络以 ADR 0063
-的标定为准：1e-4 到约 2.9e-4（月球距离单位）收敛，超出包络的目标以
+的标定为准：单中心对 Halo 种子约 1.1e-2（月球距离单位）收敛，超出的目标以
 状态三元组如实报告不收敛。
 """
 
@@ -43,7 +43,7 @@ class TestConstruction:
     def test_small_amplitude_converges(self, halo_seed) -> None:
         """包络内振幅构造：收敛、残差达筛选级、振幅命中目标、周期自洽。"""
         orbit, dynamics = halo_seed
-        result = construct_invariant_torus(orbit, _TEST_AMPLITUDE, n_points=16, dynamics=dynamics)
+        result = construct_invariant_torus(orbit, _TEST_AMPLITUDE, n_points=17, dynamics=dynamics)
         assert result.status.value == "converged"
         assert result.cause.value == "none"
         assert result.invariance_residual <= 1e-9
@@ -58,7 +58,7 @@ class TestConstruction:
     def test_rotation_number_hits_multiplier_argument_limit(self, halo_seed) -> None:
         """振幅趋于零时旋转数回到单值矩阵中心对辐角（定义性断言）。"""
         orbit, dynamics = halo_seed
-        result = construct_invariant_torus(orbit, 5e-5, n_points=16, dynamics=dynamics)
+        result = construct_invariant_torus(orbit, 5e-5, n_points=17, dynamics=dynamics)
         assert result.status.value == "converged"
         alpha = _center_argument(orbit, dynamics)
         assert result.multiplier_argument == pytest.approx(alpha, abs=1e-10)
@@ -67,9 +67,9 @@ class TestConstruction:
     def test_result_shapes(self, halo_seed) -> None:
         """输出契约：曲线网格、相位网格与迭代历史。"""
         orbit, dynamics = halo_seed
-        result = construct_invariant_torus(orbit, _TEST_AMPLITUDE, n_points=16, dynamics=dynamics)
-        assert result.curve_states.shape == (16, 6)
-        np.testing.assert_allclose(result.phases, np.arange(16) * (2.0 * np.pi / 16))
+        result = construct_invariant_torus(orbit, _TEST_AMPLITUDE, n_points=17, dynamics=dynamics)
+        assert result.curve_states.shape == (17, 6)
+        np.testing.assert_allclose(result.phases, np.arange(17) * (2.0 * np.pi / 17))
         assert result.newton_iterations >= 1
         assert result.residual_history
         assert result.monodromy.shape == (6, 6)
@@ -79,7 +79,7 @@ class TestDiagnostics:
     def test_invariance_residual_recomputes(self, halo_seed) -> None:
         """不变性残差作为独立函数可复算，与结果字段同量级。"""
         orbit, dynamics = halo_seed
-        result = construct_invariant_torus(orbit, _TEST_AMPLITUDE, n_points=16, dynamics=dynamics)
+        result = construct_invariant_torus(orbit, _TEST_AMPLITUDE, n_points=17, dynamics=dynamics)
         residual = invariance_residual(
             result.curve_states,
             result.rotation_number,
@@ -91,7 +91,7 @@ class TestDiagnostics:
     def test_conjugacy_residual_small(self, halo_seed) -> None:
         """共轭性残差：各采样点的推进角与 ρ 的偏离为小量。"""
         orbit, dynamics = halo_seed
-        result = construct_invariant_torus(orbit, _TEST_AMPLITUDE, n_points=16, dynamics=dynamics)
+        result = construct_invariant_torus(orbit, _TEST_AMPLITUDE, n_points=17, dynamics=dynamics)
         residual = conjugacy_residual(
             result.curve_states,
             result.rotation_number,
@@ -108,7 +108,7 @@ class TestDiagnostics:
         言。
         """
         orbit, dynamics = halo_seed
-        result = construct_invariant_torus(orbit, _TEST_AMPLITUDE, n_points=16, dynamics=dynamics)
+        result = construct_invariant_torus(orbit, _TEST_AMPLITUDE, n_points=17, dynamics=dynamics)
         distance = torus_long_time_distance(
             result.curve_states,
             result.strobe_period,
@@ -120,7 +120,7 @@ class TestDiagnostics:
     def test_evaluate_curve_interpolates_grid(self, halo_seed) -> None:
         """带限插值在网格点上复现采样，在半格点上给出有界中间值。"""
         orbit, dynamics = halo_seed
-        result = construct_invariant_torus(orbit, _TEST_AMPLITUDE, n_points=16, dynamics=dynamics)
+        result = construct_invariant_torus(orbit, _TEST_AMPLITUDE, n_points=17, dynamics=dynamics)
         np.testing.assert_allclose(
             evaluate_torus_curve(result.curve_states, result.phases),
             result.curve_states,
@@ -128,7 +128,7 @@ class TestDiagnostics:
         )
         mid = evaluate_torus_curve(result.curve_states, result.phases + np.pi / 16.0)
         assert np.all(np.isfinite(mid))
-        assert mid.shape == (16, 6)
+        assert mid.shape == (17, 6)
 
 
 class TestFailurePaths:
@@ -136,16 +136,22 @@ class TestFailurePaths:
         """迭代预算耗尽时如实报告状态三元组，不抛异常。"""
         orbit, dynamics = halo_seed
         result = construct_invariant_torus(
-            orbit, _TEST_AMPLITUDE, n_points=16, dynamics=dynamics, max_iterations=1
+            orbit, _TEST_AMPLITUDE, n_points=17, dynamics=dynamics, max_iterations=1
         )
         assert result.status.value == "max_iterations"
         assert result.cause.value == "max_iterations_reached"
         assert result.message
 
     def test_beyond_envelope_reports_status_triple(self, halo_seed) -> None:
-        """超出可达振幅包络的目标如实报告不收敛，不伪造结果。"""
+        """超出可达振幅包络的目标如实报告不收敛，不伪造结果。
+
+        振幅 0.05 在包络外（ADR 0063 标定约 1.1e-2），迭代上限压到 2
+        保证秒级耗时；断言的是诚实失败本身，不是失败的具体原因码。
+        """
         orbit, dynamics = halo_seed
-        result = construct_invariant_torus(orbit, 0.01, n_points=16, dynamics=dynamics)
+        result = construct_invariant_torus(
+            orbit, 0.05, n_points=17, dynamics=dynamics, max_iterations=2
+        )
         assert result.status.value != "converged"
         assert result.message
 

@@ -12,8 +12,9 @@
 连续对称：快相位切片（曲线沿流推进仍是解，流与自身可交换）、慢相位
 参数化原点（参数旋转）与振幅（环面族参数）；前两者各配一条规范方程
 （切片取曲线沿流方向的平均偏离为零，参数取一阶正弦分量过零），振幅
-由钉扎条件约束。求解用信赖域阻尼最小二乘牛顿迭代，与共享 PAL 内核
-的机器同口径。
+由钉扎条件约束。求解用高斯牛顿迭代加 Armijo 回溯线搜索（SVD 分解滤
+奇异值），与共享 PAL 内核的 SVD 牛顿加回溯线搜索机器同口径；配合从
+小振幅起的同伦阶梯把解爬到目标振幅。
 
 振幅按环面相对种子轨道的最大法向偏离（月球距离单位）参数化。术语见
 CONTEXT.md 的拟周期不变环面一节，决策与口径见 ADR 0063。
@@ -54,16 +55,18 @@ _COMPLEX_IMAG_TOL = 1e-12
 #: 平面轨道法向支撑（z、vz 分量占比）的判定阈值。
 _NORMAL_SUPPORT_TOL = 1e-6
 
-#: 最小网格点数：带限闭曲线至少要分辨 k=±1 主模。
-_MIN_POINTS = 8
+#: 最小网格点数：带限闭曲线至少要分辨 k=±1 主模，且须为奇数（见
+#: _band_limited 的 Nyquist 说明）。
+_MIN_POINTS = 9
 
 #: 不变性条件的配点过采样倍数：配点数为网格点数的两倍。
 _OVERSAMPLE = 2
 
-#: 振幅同伦的起始振幅与逐级放大倍数。倍数按标定取 1.3：2.5 倍级差在
-#: 2.5e-4 附近撞残差地板，1.3 倍级差实测可达约 2.9e-4。
+#: 振幅同伦的起始振幅与逐级放大倍数。起始振幅取线性种子的高斯牛顿
+#: 收敛域内（1e-4），级差按标定取 1.6：配合回溯线搜索实测可爬到 1e-2
+#: 量级振幅。
 _HOMOTOPY_START = 1e-4
-_HOMOTOPY_FACTOR = 1.3
+_HOMOTOPY_FACTOR = 1.6
 
 #: 残差停滞下限：低于此值视为积分噪声地板。
 _STAGNATION_LIMIT = 1e-14
@@ -71,8 +74,8 @@ _STAGNATION_LIMIT = 1e-14
 #: 残差发散上限。
 _DIVERGENCE_LIMIT = 1e10
 
-#: 信赖域阻尼的档位数（每档放大十倍，起始 1e-6）。
-_MAX_DAMPING = 24
+#: 回溯线搜索的最大折半次数。
+_MAX_LINE_SEARCH = 24
 
 #: 振幅细网格的过采样倍数。
 _FINE_OVERSAMPLE = 8
@@ -231,15 +234,21 @@ def central_multiplier_pair(matrix: np.ndarray, flow_direction: np.ndarray) -> C
 
 
 def _band_limited(curve: np.ndarray, phi: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """网格采样的带限重建与相位导数（fft 序对称模式集，单一份实现）。"""
+    """网格采样的带限重建与相位导数（fft 序对称模式集，单一份实现）。
+
+    网格须为奇数：偶数网格的 Nyquist 模（k = n/2）在实带限表示里没有
+    共轭搭档，旋转该模需要频带外的 sin 部分，数值解把残余垃圾堆进该模
+    后旋转不一致性直接变成残差地板（两种种子实测 1e-6 量级）。奇数网格
+    的全部模式共轭成对，旋转逐模精确。
+    """
     n = curve.shape[0]
     coef = np.fft.rfft(curve, axis=0)
-    half = n // 2
-    weights = np.full(half + 1, 2.0)
+    weights = np.full(n // 2 + 1, 2.0)
     weights[0] = 1.0
-    weights[-1] = 1.0
+    if n % 2 == 0:
+        weights[-1] = 1.0
     spectrum = coef * weights[:, None]
-    modes = np.arange(half + 1)
+    modes = np.arange(n // 2 + 1)
     wave = np.exp(1j * np.outer(phi, modes))
     values = np.real(wave @ spectrum) / n
     slope = np.real((1j * modes[None, :] * wave) @ spectrum) / n
@@ -250,8 +259,8 @@ def evaluate_torus_curve(curve_states: npt.ArrayLike, phases: npt.ArrayLike) -> 
     """闭曲线的带限插值：在任意相位处求值网格采样的环面截面。
 
     Args:
-        curve_states: 网格采样，形状 (n_points, 6)，须来自偶数点等间距
-            网格。
+        curve_states: 网格采样，形状 (n_points, 6)，须来自奇数点等间距
+            网格（偶数网格含不可一致旋转的 Nyquist 模，见 _band_limited）。
         phases: 求值相位（rad），标量或一维数组。
 
     Returns:
@@ -259,8 +268,8 @@ def evaluate_torus_curve(curve_states: npt.ArrayLike, phases: npt.ArrayLike) -> 
     """
     curve = np.asarray(curve_states, dtype=float)
     n = curve.shape[0]
-    if n < 4 or n % 2 != 0:
-        raise TorusError(f"curve_states 须为不小于 4 行的偶数行网格采样，当前 {n} 行")
+    if n < 5 or n % 2 == 0:
+        raise TorusError(f"curve_states 须为不小于 5 行的奇数行网格采样，当前 {n} 行")
     phi = np.atleast_1d(np.asarray(phases, dtype=float))
     return _band_limited(curve, phi)[0]
 
@@ -369,19 +378,18 @@ class _Outcome:
 
 
 def _newton(problem: _Problem, q0: np.ndarray, max_iterations: int) -> _Outcome:
-    """信赖域阻尼最小二乘牛顿迭代。
+    """高斯牛顿迭代加 Armijo 回溯线搜索。
 
-    最小范数步在弱定方向上可能远超线性化有效域，曲率误差会把残差钉在
-    与初值同量级的地板上。步长受信赖域硬约束（初值取振幅的一半），按
-    实际下降与线性预测的增益比自适应：增益好则放大信赖域并放松阻尼，
-    增益差则收紧阻尼并折半信赖域。钉扎偏离的正性一并守卫。
+    步长控制取纯高斯牛顿方向上的 t 缩放而不是 Levenberg 阻尼：阻尼先削
+    平坦方向的分量，而远离解时需要的修正恰恰整体住在平坦方向上，按奇
+    异值阻尼会得到方向错乱的步，实测在振幅阶梯上撞 1e-6 量级残差地板；
+    t 缩放保持方向、只收步长，配合振幅同伦可爬到 1e-2 量级振幅。线搜索
+    用 Armijo 判据（平方残差充分下降），并守卫钉扎偏离的正性。
     """
     n = problem.n
     q = q0.copy()
     history: list[float] = []
     residual: np.ndarray | None = None
-    damping = 1e-6
-    trust = 0.5 * problem.amplitude
     for iteration in range(1, max_iterations + 1):
         try:
             if residual is None:
@@ -446,16 +454,16 @@ def _newton(problem: _Problem, q0: np.ndarray, max_iterations: int) -> _Outcome:
         assert stms is not None
         jac = _jacobian(problem, q, images, stms)
         left, singular, right_t = np.linalg.svd(jac, full_matrices=False)
-        projected = left.T @ (-residual)
-        base_norm = float(np.linalg.norm(residual))
+        filter_ = np.where(singular > singular[0] * 1e-12, singular / (singular**2), 0.0)
+        step = right_t.T @ (filter_ * (left.T @ (-residual)))
+        base_square = float(residual @ residual)
         accepted = False
-        for _ in range(_MAX_DAMPING):
-            step = right_t.T @ ((singular / (singular**2 + damping)) * projected)
-            trial = q + step
+        for attempt in range(_MAX_LINE_SEARCH):
+            factor = 0.5**attempt
+            trial = q + factor * step
             trial_curve = trial[: 6 * n].reshape(n, 6)
             usable = (
-                np.all(np.isfinite(step))
-                and float(np.abs(step).max()) <= trust
+                np.all(np.isfinite(trial))
                 and float(np.linalg.norm(_anchor_deviation(problem, trial_curve))) > 1e-12
             )
             if usable:
@@ -465,29 +473,20 @@ def _newton(problem: _Problem, q0: np.ndarray, max_iterations: int) -> _Outcome:
                     trial_residual = None
             else:
                 trial_residual = None
-            if trial_residual is not None:
-                base_square = base_norm * base_norm
-                actual = base_square - float(np.linalg.norm(trial_residual)) ** 2
-                predicted = base_square - float(np.linalg.norm(residual + jac @ step)) ** 2
-                gain = actual / predicted if predicted > 0.0 else 1.0
-                if actual > 0.0 and gain > 0.1:
-                    if gain > 0.75 or predicted <= 0.0:
-                        trust = min(2.0 * trust, 1.0)
-                        damping = max(damping / 10.0, 1e-16)
-                    else:
-                        damping *= 4.0
-                    q = trial
-                    residual = trial_residual
-                    accepted = True
-                    break
-            damping *= 10.0
-            trust = max(0.5 * trust, 1e-12)
+            if (
+                trial_residual is not None
+                and float(trial_residual @ trial_residual) <= (1.0 - 1e-4 * factor) * base_square
+            ):
+                q = trial
+                residual = trial_residual
+                accepted = True
+                break
         if not accepted:
             return _Outcome(
                 q,
                 ConvergenceState.STAGNATED,
                 FailureCause.STAGNATION_DETECTED,
-                f"阻尼最小二乘在 {_MAX_DAMPING} 档阻尼内未能下降残差（{norm:.2e}）",
+                f"回溯线搜索 {_MAX_LINE_SEARCH} 次折半未能充分下降残差（{norm:.2e}）",
                 iteration,
                 history,
             )
@@ -564,9 +563,9 @@ def construct_invariant_torus(
     orbit: Orbit,
     amplitude: float,
     *,
-    n_points: int = 24,
+    n_points: int = 25,
     dynamics: CR3BP_Dynamics | None = None,
-    tolerance: float = 1e-10,
+    tolerance: float = 1e-9,
     max_iterations: int = 50,
 ) -> InvariantTorus:
     """在周期轨道邻域构造二维不变环面。
@@ -580,9 +579,10 @@ def construct_invariant_torus(
         orbit: 带单圈周期真值的周期轨道，只读取首点状态与周期。
         amplitude: 目标振幅：环面相对种子轨道的最大法向偏离（月球距离
             单位），平面种子即最大 |z|。
-        n_points: 相位网格点数（偶数，不小于 8），即曲线分辨率。
+        n_points: 相位网格点数（奇数，不小于 9），即曲线分辨率。
         dynamics: 地月 CR3BP 动力学；缺省用标准地月系统。积分容差取
-            dynamics 自带 rtol/atol，残差容差 1e-10 需要研究级积分。
+            dynamics 自带 rtol/atol，默认残差容差 1e-9 已贴研究级积分的
+            噪声地板，收紧前先收紧积分容差。
         tolerance: 收敛容差：不变性残差无穷范数上限。
         max_iterations: 牛顿迭代上限。
 
@@ -599,8 +599,8 @@ def construct_invariant_torus(
         raise TorusError("orbit.period 未设置或非正，须先给出单圈周期真值")
     if not math.isfinite(amplitude) or amplitude <= 0.0:
         raise TorusError(f"amplitude 须为正有限值，当前 {amplitude}")
-    if n_points % 2 != 0 or n_points < _MIN_POINTS:
-        raise TorusError(f"n_points 须为不小于 {_MIN_POINTS} 的偶数，当前 {n_points}")
+    if n_points % 2 == 0 or n_points < _MIN_POINTS:
+        raise TorusError(f"n_points 须为不小于 {_MIN_POINTS} 的奇数，当前 {n_points}")
     if max_iterations < 1:
         raise TorusError(f"max_iterations 须为正，当前 {max_iterations}")
     if dynamics is None:
