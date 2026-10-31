@@ -63,10 +63,10 @@ _MIN_POINTS = 9
 _OVERSAMPLE = 2
 
 #: 振幅同伦的起始振幅与逐级放大倍数。起始振幅取线性种子的高斯牛顿
-#: 收敛域内（1e-4），级差按标定取 1.6：配合回溯线搜索实测可爬到 1e-2
-#: 量级振幅。
+#: 收敛域内（1e-4）；级差按标定取 1.25，大振幅处映射曲率增大，更陡的
+#: 级差（1.6）会在 0.02 附近失去收敛域。
 _HOMOTOPY_START = 1e-4
-_HOMOTOPY_FACTOR = 1.6
+_HOMOTOPY_FACTOR = 1.25
 
 #: 残差停滞下限：低于此值视为积分噪声地板。
 _STAGNATION_LIMIT = 1e-14
@@ -157,6 +157,7 @@ class _Problem:
     state0: np.ndarray
     amplitude: float
     n: int
+    free_directions: int
     m: int
     strobe_period: float
     sin_phi: np.ndarray
@@ -454,7 +455,12 @@ def _newton(problem: _Problem, q0: np.ndarray, max_iterations: int) -> _Outcome:
         assert stms is not None
         jac = _jacobian(problem, q, images, stms)
         left, singular, right_t = np.linalg.svd(jac, full_matrices=False)
-        filter_ = np.where(singular > singular[0] * 1e-12, singular / (singular**2), 0.0)
+        # 丢弃最小的 free_directions 个奇异方向：双中心对种子的面内振幅
+        # 方向是精确零空间（数值 σ 极小但非零），按 σ/σ² 放大会把步长
+        # 爆到该方向上；该方向的解族成员都满足方程，显式忽略即可。
+        cutoff = len(singular) - problem.free_directions
+        keep = np.arange(len(singular)) < cutoff
+        filter_ = np.where(keep & (singular > singular[0] * 1e-12), singular / (singular**2), 0.0)
         step = right_t.T @ (filter_ * (left.T @ (-residual)))
         base_square = float(residual @ residual)
         accepted = False
@@ -579,7 +585,10 @@ def construct_invariant_torus(
         orbit: 带单圈周期真值的周期轨道，只读取首点状态与周期。
         amplitude: 目标振幅：环面相对种子轨道的最大法向偏离（月球距离
             单位），平面种子即最大 |z|。
-        n_points: 相位网格点数（奇数，不小于 9），即曲线分辨率。
+        n_points: 相位网格点数（奇数，不小于 9），即曲线分辨率。网格
+            密度须随振幅放大：环面截面的高次谐波随振幅增长，带宽不足
+            时残差停在截断地板。L2 Halo 标定：振幅到 1e-2 量级用 17 点，
+            到 0.031 用 33 点。
         dynamics: 地月 CR3BP 动力学；缺省用标准地月系统。积分容差取
             dynamics 自带 rtol/atol，默认残差容差 1e-9 已贴研究级积分的
             噪声地板，收紧前先收紧积分容差。
@@ -642,6 +651,17 @@ def construct_invariant_torus(
 
     _, projection, gauge = _initial_curve(state0, center, amplitude, n_points)
     position_projection = projection[:3, :]
+    # 未规范方向数：每个非平凡单位模对贡献一个环面族振幅参数，钉扎只固定
+    # 所选对（平面种子的法向）的振幅，其余对（面内）的振幅方向是方程组的
+    # 精确零空间，高斯牛顿求解显式丢弃（见 _newton）。
+    unit_pairs = sum(
+        1
+        for pair in classify_multiplier_pairs(matrix, flow, flow)
+        if not pair.is_trivial
+        and min(abs(abs(value) - 1.0) for value in pair.eigenvalues) <= _UNIT_MODULUS_TOL
+        and min(abs(value.imag) for value in pair.eigenvalues) > _COMPLEX_IMAG_TOL
+    )
+    free_directions = max(0, unit_pairs - 1)
 
     def fine_amplitude(curve: np.ndarray) -> tuple[float, float]:
         values = evaluate_torus_curve(curve, fine)
@@ -671,6 +691,7 @@ def construct_invariant_torus(
                 state0=state0,
                 amplitude=level,
                 n=n_points,
+                free_directions=free_directions,
                 m=os_count,
                 strobe_period=seed_period,
                 sin_phi=np.sin(os_phases),
